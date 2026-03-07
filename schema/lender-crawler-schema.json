@@ -1,0 +1,658 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lenderdb/lender-crawler-schema/v1",
+  "title": "LenderDB Crawler Extraction Schema",
+  "description": "Defines every field the crawler must attempt to extract, where to look, and how to normalize the result.",
+  "version": "1.0.0",
+
+  "extraction_strategy": {
+    "priority_sources": [
+      "lender_website_product_pages",
+      "association_membership_directories",
+      "regulatory_license_databases",
+      "lending_marketplace_listings",
+      "press_releases_and_news",
+      "conference_sponsor_listings",
+      "broker_program_pages"
+    ],
+    "confidence_scoring": {
+      "direct_statement_on_lender_site": 95,
+      "association_directory_listing": 85,
+      "regulatory_database": 90,
+      "marketplace_listing": 75,
+      "inferred_from_case_studies": 50,
+      "broker_network_report": 60,
+      "stale_over_90_days": "subtract_15"
+    }
+  },
+
+  "fields": {
+
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Legal or trade name of the lending entity.",
+      "extraction": {
+        "look_for": [
+          "Page <title> tag",
+          "H1 on homepage or 'About Us' page",
+          "Footer legal name",
+          "Regulatory filing entity name"
+        ],
+        "normalize": "Title case. Strip 'LLC', 'Inc', 'Corp', 'NA', 'FSB' suffixes only when a short-form name exists as an alias.",
+        "examples": ["Ascentium Capital", "Wells Fargo Equipment Finance", "GreatAmerica Financial Services"]
+      }
+    },
+
+    "shortName": {
+      "type": "string",
+      "required": false,
+      "description": "Common abbreviated name brokers use in conversation.",
+      "extraction": {
+        "look_for": [
+          "Logo alt text",
+          "Domain name (strip TLD)",
+          "Industry association profile",
+          "How the company refers to itself in press releases"
+        ],
+        "examples": ["Ascentium", "WF Equipment", "GreatAmerica"]
+      }
+    },
+
+    "lenderType": {
+      "type": "string",
+      "required": true,
+      "enum": ["bank", "credit_union", "leasing_company", "specialty_finance", "private_credit", "captive", "cdfi"],
+      "description": "Category of the lending institution.",
+      "extraction": {
+        "signals": {
+          "bank": ["FDIC insured", "chartered bank", "national bank", "savings bank", "OCC regulated", "Federal Reserve member"],
+          "credit_union": ["NCUA", "credit union", "member-owned", "cooperative"],
+          "leasing_company": ["leasing company", "lessor", "equipment lessor", "finance company"],
+          "specialty_finance": ["specialty finance", "commercial finance", "independent finance", "non-bank lender", "alternative lender"],
+          "private_credit": ["private credit", "private debt", "direct lending", "institutional lending", "fund"],
+          "captive": ["captive finance", "OEM financing", "manufacturer financing", "dealer financing", "[brand name] Financial"],
+          "cdfi": ["CDFI", "community development", "SBA preferred lender", "mission-based", "underserved communities"]
+        },
+        "fallback": "If regulatory license exists = bank or credit_union. If tied to manufacturer = captive. Otherwise = specialty_finance."
+      }
+    },
+
+    "tier": {
+      "type": "integer",
+      "required": true,
+      "enum": [1, 2, 3, 4],
+      "description": "Market tier based on deal size capacity and national footprint.",
+      "extraction": {
+        "derive_from_rules": [
+          "Tier 1: maxDealSize > $50M AND countriesServed has 3+ countries",
+          "Tier 2: maxDealSize $5M-$50M AND national US or 2+ countries",
+          "Tier 3: maxDealSize $500k-$5M OR regional focus",
+          "Tier 4: maxDealSize < $500k OR single state/metro"
+        ],
+        "note": "Do not extract directly — compute from deal size and geographic footprint after those fields are extracted."
+      }
+    },
+
+    "parentCompany": {
+      "type": "string",
+      "required": false,
+      "description": "Parent corporation if the lender is a subsidiary or division.",
+      "extraction": {
+        "look_for": [
+          "'A [Parent] Company' in footer",
+          "'Subsidiary of' in About page",
+          "SEC EDGAR parent entity filings",
+          "LinkedIn 'Parent company' field",
+          "Press release bylines"
+        ],
+        "examples": ["Wells Fargo & Company", "Rabobank", "KeyCorp"]
+      }
+    },
+
+    "website": {
+      "type": "string",
+      "format": "uri",
+      "required": true,
+      "description": "Primary domain of the lender.",
+      "extraction": {
+        "look_for": ["Association directory listing URL", "Regulatory database URL", "Google search first result for lender name + 'equipment finance'"],
+        "normalize": "Always store as https://www.domain.com — no trailing slash, no subpaths."
+      }
+    },
+
+    "hqCountry": {
+      "type": "string",
+      "required": true,
+      "description": "ISO 3166-1 alpha-2 country code for headquarters.",
+      "extraction": {
+        "look_for": [
+          "Contact page address",
+          "Footer address",
+          "LinkedIn company location",
+          "Regulatory filing address",
+          "Press release dateline city"
+        ],
+        "normalize": "Map to ISO 2-letter code: United States → US, Canada → CA, United Kingdom → GB, Australia → AU, Germany → DE, France → FR, Netherlands → NL.",
+        "examples": ["US", "CA", "GB", "NL", "AU"]
+      }
+    },
+
+    "hqState": {
+      "type": "string",
+      "required": false,
+      "description": "US state abbreviation (2 letters) for US-headquartered lenders.",
+      "extraction": {
+        "look_for": ["Same as hqCountry — extract state from address"],
+        "normalize": "Always 2-letter USPS abbreviation. 'Texas' → 'TX', 'California' → 'CA'.",
+        "only_for": "hqCountry = US"
+      }
+    },
+
+    "minDealSize": {
+      "type": "number",
+      "required": true,
+      "description": "Minimum transaction size the lender will consider, in USD.",
+      "extraction": {
+        "look_for": [
+          "Equipment financing product pages",
+          "'Starting at $X' or 'Minimum $X'",
+          "'Financing from $X to $Y'",
+          "Application minimum note ('Deals under $X not accepted')",
+          "FAQ page",
+          "Broker program guide PDF"
+        ],
+        "trigger_phrases": [
+          "minimum", "starting from", "as low as", "from $", "minimum transaction",
+          "deals starting at", "minimum deal", "not less than", "floor of"
+        ],
+        "normalize": "Convert all to USD integer. '$5k' → 5000, '$1.5M' → 1500000, '$2 million' → 2000000.",
+        "fallback": "If not found, set to null and flag for manual review. Do NOT guess.",
+        "examples": [5000, 10000, 25000, 100000, 500000]
+      }
+    },
+
+    "maxDealSize": {
+      "type": "number",
+      "required": true,
+      "description": "Maximum single transaction size the lender will consider, in USD.",
+      "extraction": {
+        "look_for": [
+          "Same pages as minDealSize",
+          "'Up to $X', 'Maximum $X', 'Not to exceed $X'",
+          "Case studies — largest deal mentioned",
+          "Regulatory capital ratio filings can imply limits"
+        ],
+        "trigger_phrases": [
+          "up to", "maximum", "not to exceed", "as much as", "to $", "cap of", "limit of", "ceiling"
+        ],
+        "normalize": "Same as minDealSize — convert to USD integer.",
+        "note": "If page says 'no maximum', set to 500000000 (500M) as sentinel.",
+        "examples": [250000, 2000000, 10000000, 100000000]
+      }
+    },
+
+    "preferredDealMin": {
+      "type": "number",
+      "required": false,
+      "description": "Lower bound of the lender's preferred deal sweet spot (not hard minimum).",
+      "extraction": {
+        "look_for": [
+          "'Sweet spot', 'typically finance', 'most comfortable with', 'focus on deals between'",
+          "Case study median deal sizes",
+          "Sales rep quotes in trade press"
+        ],
+        "note": "Softer signal than minDealSize. Use only when explicitly stated or strongly implied.",
+        "examples": [25000, 100000, 500000]
+      }
+    },
+
+    "preferredDealMax": {
+      "type": "number",
+      "required": false,
+      "description": "Upper bound of the lender's preferred deal sweet spot.",
+      "extraction": {
+        "look_for": ["Same as preferredDealMin"],
+        "examples": [500000, 5000000, 25000000]
+      }
+    },
+
+    "industriesFavored": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": true,
+      "description": "Industries the lender actively targets or promotes as focus areas.",
+      "extraction": {
+        "look_for": [
+          "'Industries We Serve' or 'Markets We Serve' page sections",
+          "Product sub-pages (e.g., 'Healthcare Equipment Financing')",
+          "Navigation menu items that represent industry verticals",
+          "Homepage hero copy ('financing for healthcare, construction, transportation')",
+          "Case study categories",
+          "Press releases announcing industry-specific programs",
+          "Equipment categories imply industries (medical = healthcare, excavators = construction)"
+        ],
+        "trigger_phrases": [
+          "specialize in", "focus on", "serve", "industries we finance",
+          "markets we serve", "sectors", "verticals", "expertise in"
+        ],
+        "taxonomy": [
+          "agriculture", "aviation", "clean_energy", "construction", "food_beverage",
+          "food_service", "government", "healthcare", "manufacturing", "office",
+          "professional_services", "real_estate", "retail", "technology",
+          "transportation", "waste_management", "mining", "marine", "education",
+          "hospitality", "printing", "telecommunications", "industrial_ot"
+        ],
+        "normalize": "Map extracted phrases to taxonomy values. 'Medical' → healthcare, 'Trucking' → transportation, 'Solar/Wind' → clean_energy, 'Restaurants' → food_service.",
+        "examples": ["healthcare", "construction", "transportation"]
+      }
+    },
+
+    "industriesAvoided": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": false,
+      "description": "Industries the lender explicitly will not finance.",
+      "extraction": {
+        "look_for": [
+          "Underwriting guidelines (often in broker program PDF)",
+          "FAQ ('We do not finance...')",
+          "Restricted industries list",
+          "Application form exclusion note"
+        ],
+        "trigger_phrases": [
+          "do not finance", "not eligible", "excluded industries", "restricted",
+          "prohibited", "we don't fund", "ineligible sectors"
+        ],
+        "common_values": ["cannabis", "gambling", "adult_entertainment", "firearms", "cryptocurrency"],
+        "normalize": "Same taxonomy as industriesFavored."
+      }
+    },
+
+    "equipmentCategories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": true,
+      "description": "Types of equipment the lender finances.",
+      "extraction": {
+        "look_for": [
+          "Equipment type listings on product pages",
+          "Navigation categories ('Medical Equipment', 'Construction Equipment')",
+          "Photo content (what equipment appears in imagery)",
+          "Case studies ('financed a fleet of...', 'funded the purchase of...')"
+        ],
+        "taxonomy": [
+          "agricultural", "aircraft", "clean_energy", "copiers", "energy",
+          "fleet", "food_processing", "general", "heavy_equipment", "infrastructure",
+          "manufacturing", "medical", "office", "restaurant", "retail", "technology",
+          "telecom", "trailers", "trucks", "vehicles", "marine", "mining", "printing"
+        ],
+        "normalize": "Consolidate. 'MRI machines, surgical robots' → medical. 'Excavators, bulldozers' → heavy_equipment.",
+        "examples": ["medical", "vehicles", "technology", "heavy_equipment"]
+      }
+    },
+
+    "countriesServed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": true,
+      "description": "Countries where the lender actively originates deals. ISO alpha-2 codes.",
+      "extraction": {
+        "look_for": [
+          "Contact page office locations",
+          "'We serve customers in...'",
+          "International or global mention on homepage",
+          "Regulatory licenses (each country requires separate registration)",
+          "Marketplace listings (usually show geography served)"
+        ],
+        "trigger_phrases": ["available in", "serving", "offices in", "licensed to operate in", "countries we serve"],
+        "normalize": "ISO 2-letter codes. If only US addresses found, set ['US']. If 'North America' mentioned, set ['US', 'CA'].",
+        "examples": [["US"], ["US", "CA"], ["US", "CA", "GB", "AU"]]
+      }
+    },
+
+    "statesServed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": false,
+      "description": "US state restrictions for lenders with limited geographic footprint.",
+      "extraction": {
+        "look_for": [
+          "State licensing disclosures (footer or legal page)",
+          "'We currently serve customers in the following states:'",
+          "State-specific regulatory filings (NMLS for non-bank lenders)",
+          "Application form state dropdown with limited options"
+        ],
+        "trigger_phrases": ["licensed in", "available in these states", "serving", "currently offer in"],
+        "note": "Only populate if lender explicitly restricts by state. Leave empty if national coverage.",
+        "normalize": "USPS 2-letter state abbreviations.",
+        "examples": [["CA", "OR", "WA", "AZ", "NV"], ["TX", "OK", "LA", "AR"]]
+      }
+    },
+
+    "riskTolerance": {
+      "type": "string",
+      "required": true,
+      "enum": ["conservative", "moderate", "aggressive"],
+      "description": "How the lender approaches credit risk on borrowers.",
+      "extraction": {
+        "derive_from": [
+          "minCreditFico: <600 = aggressive, 600-650 = moderate, 650-700 = moderate, 700+ = conservative",
+          "minTimeInBusinessMonths: <12 = aggressive, 12-36 = moderate, 36+ = conservative",
+          "Explicit language: 'startups welcome', 'challenged credit' = aggressive",
+          "Explicit language: 'investment-grade only', 'strong financials required' = conservative"
+        ],
+        "trigger_phrases": {
+          "conservative": ["investment grade", "strong credit", "established businesses", "minimum 5 years", "bank-quality"],
+          "moderate": ["most creditworthy SMBs", "good credit", "reasonable credit history"],
+          "aggressive": ["startup friendly", "challenged credit", "all credit considered", "credit scores from 500", "new businesses welcome", "bad credit ok"]
+        }
+      }
+    },
+
+    "minCreditFico": {
+      "type": "integer",
+      "required": false,
+      "description": "Minimum personal FICO score the lender typically requires.",
+      "extraction": {
+        "look_for": [
+          "Application qualification page",
+          "FAQ ('What credit score do I need?')",
+          "Broker underwriting guidelines",
+          "Marketplace listing requirements"
+        ],
+        "trigger_phrases": [
+          "minimum credit score", "FICO score of", "credit score of at least",
+          "requires a", "minimum score", "credit score requirement"
+        ],
+        "normalize": "Integer 300-850. '640+' → 640. 'Mid-600s' → 650 (approximate, flag as inferred).",
+        "examples": [575, 600, 620, 640, 660, 680, 700]
+      }
+    },
+
+    "minTimeInBusinessMonths": {
+      "type": "integer",
+      "required": false,
+      "description": "Minimum months in business required.",
+      "extraction": {
+        "look_for": [
+          "Eligibility requirements page",
+          "FAQ ('How long must my business be open?')",
+          "Application requirements",
+          "Broker guidelines"
+        ],
+        "trigger_phrases": [
+          "in business for at least", "minimum time in business", "been operating",
+          "years in business", "months in operation", "established"
+        ],
+        "normalize": "Convert to months. '2 years' → 24, '6 months' → 6, '1 year' → 12.",
+        "examples": [6, 12, 24, 36, 60]
+      }
+    },
+
+    "lendingProducts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "required": true,
+      "enum_values": ["finance_lease", "operating_lease", "equipment_loan", "sale_leaseback", "trac_lease", "fmv_lease", "line_of_credit", "working_capital"],
+      "description": "Financing structures the lender offers.",
+      "extraction": {
+        "look_for": [
+          "Products/Solutions navigation",
+          "'Types of financing' section",
+          "Product comparison pages"
+        ],
+        "signal_mapping": {
+          "finance_lease": ["$1 buyout lease", "finance lease", "capital lease", "full-payout lease"],
+          "operating_lease": ["operating lease", "off-balance sheet", "true lease"],
+          "equipment_loan": ["equipment loan", "term loan", "secured loan", "loan"],
+          "sale_leaseback": ["sale-leaseback", "sale and leaseback", "monetize existing equipment"],
+          "trac_lease": ["TRAC lease", "terminal rental adjustment clause", "fleet TRAC"],
+          "fmv_lease": ["FMV lease", "fair market value lease", "fair market value buyout", "FMV option"],
+          "line_of_credit": ["line of credit", "revolving credit", "credit facility", "LOC"],
+          "working_capital": ["working capital", "business cash advance", "merchant cash advance", "bridge financing"]
+        }
+      }
+    },
+
+    "approvalSpeed": {
+      "type": "string",
+      "required": true,
+      "enum": ["same_day", "2_3_days", "1_week", "2_4_weeks", "30_plus_days"],
+      "description": "Typical time from application to credit decision.",
+      "extraction": {
+        "look_for": [
+          "Homepage value propositions ('Fast approvals!')",
+          "Product pages ('Decision within 24 hours')",
+          "Broker program materials ('Turnaround: 48 hours')",
+          "Case studies or testimonials mentioning speed"
+        ],
+        "signal_mapping": {
+          "same_day": ["same-day decision", "instant approval", "approve in minutes", "24 hours", "within hours", "immediate decision"],
+          "2_3_days": ["48 hours", "2 business days", "48-72 hours", "two days", "three days", "72 hours"],
+          "1_week": ["within a week", "5 business days", "one week", "weekly review"],
+          "2_4_weeks": ["two to four weeks", "10 business days", "2-3 weeks", "committee review"],
+          "30_plus_days": ["30 days", "underwriting process", "detailed review", "due diligence required"]
+        },
+        "note": "Prioritize broker-program-specific turnaround times over general marketing claims."
+      }
+    },
+
+    "appetiteSignals": {
+      "type": "array",
+      "required": false,
+      "description": "Dynamic intelligence snippets about current lender appetite. The most valuable field.",
+      "items": {
+        "text": "Plain English statement about what the lender is actively doing right now.",
+        "type": "positive | caution | negative",
+        "source": "Where this was detected.",
+        "detectedAt": "ISO 8601 datetime."
+      },
+      "extraction": {
+        "look_for": [
+          "Press releases (new product launches, geographic expansions)",
+          "Blog posts announcing new programs",
+          "Industry conference session descriptions (often reveal strategic priorities)",
+          "LinkedIn company posts",
+          "Association newsletters quoting the lender",
+          "Trade publication articles mentioning the lender",
+          "Broker network community posts about lender behavior",
+          "Regulatory filings describing portfolio growth or contraction"
+        ],
+        "positive_signals": [
+          "Launching a new industry vertical program",
+          "Expanding to new geographies",
+          "Hiring originations staff (implies appetite growth)",
+          "Announcing increased deal capacity or credit facility",
+          "Partnering with vendors in a new sector",
+          "Press release about record volume in an industry"
+        ],
+        "caution_signals": [
+          "Raising minimum credit scores or deal sizes",
+          "Adding new documentation requirements",
+          "Exiting a geography or product line",
+          "Leadership changes in credit or originations",
+          "Portfolio concentration warnings in trade press"
+        ],
+        "negative_signals": [
+          "Announcing layoffs in originations or credit",
+          "Pausing new originations",
+          "Regulatory action or enforcement",
+          "Portfolio losses or charge-off announcements",
+          "Acquired by or merging with larger entity (appetite uncertain)"
+        ],
+        "text_format": "One to two sentences, factual, present tense. Include the specific industry, geography, or product mentioned. Example: 'Actively expanding healthcare portfolio Q1 2026 — medical imaging and diagnostic equipment prioritized.'",
+        "max_age_days": 180,
+        "note": "Signals older than 180 days should be discarded unless no newer signals exist."
+      }
+    },
+
+    "originationsContact": {
+      "type": "string",
+      "required": false,
+      "description": "Name or title of the broker-facing originations contact.",
+      "extraction": {
+        "look_for": [
+          "Broker program page contact section",
+          "Submit a deal page",
+          "LinkedIn: search for '[lender name] business development' or 'originations'",
+          "Conference speaker bios"
+        ],
+        "normalize": "Prefer job title over personal name to avoid staleness. 'Equipment Finance Desk', 'Broker Relations', 'National Accounts'.",
+        "examples": ["Equipment Finance Desk", "Broker Relations Team", "National Accounts"]
+      }
+    },
+
+    "originationsEmail": {
+      "type": "string",
+      "format": "email",
+      "required": false,
+      "description": "Email address for broker deal submissions.",
+      "extraction": {
+        "look_for": [
+          "Broker program page",
+          "Contact page (look for 'brokers@', 'originations@', 'newdeals@', 'submit@')",
+          "Footer contact section",
+          "PDF broker guide"
+        ],
+        "preferred_patterns": ["broker@", "brokers@", "originations@", "newdeals@", "submit@", "deals@", "partner@"]
+      }
+    },
+
+    "originationsPhone": {
+      "type": "string",
+      "required": false,
+      "description": "Direct phone for broker originations.",
+      "extraction": {
+        "look_for": ["Same as originationsEmail — prefer broker-specific line over general customer service"],
+        "normalize": "Store as plain digits with country code: +12125551234. Strip extensions unless critical."
+      }
+    },
+
+    "brokerFriendly": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether the lender actively works with independent brokers.",
+      "extraction": {
+        "true_signals": [
+          "Has a 'Broker Program' or 'Partner Program' page",
+          "Mentions 'broker' anywhere on site",
+          "Has a broker portal or deal submission form",
+          "Listed in broker marketplace directories",
+          "Attending NAELB or equipment broker conferences"
+        ],
+        "false_signals": [
+          "Direct-only language ('We work directly with businesses')",
+          "No broker or partner mention anywhere on site",
+          "Application process requires borrower directly"
+        ],
+        "default": false,
+        "note": "If uncertain, default to false."
+      }
+    },
+
+    "brokerRegistrationRequired": {
+      "type": "boolean",
+      "required": true,
+      "description": "Whether brokers must register/onboard before submitting deals.",
+      "extraction": {
+        "true_signals": [
+          "'Register as a broker partner'",
+          "Broker portal login required",
+          "Broker approval process mentioned",
+          "'Become an approved broker'"
+        ],
+        "false_signals": [
+          "Deal submission form accessible without login",
+          "'No registration required'",
+          "Open submission portal"
+        ],
+        "default": true
+      }
+    },
+
+    "confidenceScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "required": true,
+      "description": "Crawler-assigned confidence in the accuracy of this record.",
+      "extraction": {
+        "compute_as": "Weighted average across all extracted fields.",
+        "formula": {
+          "base": 50,
+          "adjustments": [
+            "+20 if data verified from lender's own website",
+            "+15 if corroborated by regulatory database",
+            "+10 if corroborated by association directory",
+            "+5 per additional independent source",
+            "-10 if any critical field is inferred (not directly stated)",
+            "-15 if lastVerifiedDate > 60 days ago",
+            "-25 if lastVerifiedDate > 90 days ago",
+            "-5 per field marked as approximate or inferred"
+          ]
+        },
+        "note": "Cap at 95 — never 100 (data can always be stale)."
+      }
+    },
+
+    "lastVerifiedDate": {
+      "type": "string",
+      "format": "date-time",
+      "required": true,
+      "description": "ISO 8601 timestamp of the most recent crawl/verification.",
+      "extraction": {
+        "set_to": "Crawler run timestamp when record is written or updated.",
+        "note": "Update this field on every successful crawl, even if no data changed."
+      }
+    },
+
+    "sources": {
+      "type": "array",
+      "required": true,
+      "description": "All sources used to build this record, with crawl timestamps.",
+      "items": {
+        "name": "Human-readable source name",
+        "url": "Full URL of the source page",
+        "sourceType": "association | regulatory | marketplace | vendor | conference | direct | broker_network",
+        "lastCrawledAt": "ISO 8601 datetime"
+      },
+      "extraction": {
+        "note": "Every field extracted must be traceable to at least one entry here. This is required for AWS Data Exchange audit compliance."
+      }
+    }
+
+  },
+
+  "field_priority": {
+    "critical": ["name", "website", "lenderType", "minDealSize", "maxDealSize", "lendingProducts", "countriesServed", "brokerFriendly", "lastVerifiedDate", "sources"],
+    "high": ["hqCountry", "approvalSpeed", "industriesFavored", "equipmentCategories", "riskTolerance", "brokerRegistrationRequired", "confidenceScore"],
+    "medium": ["hqState", "statesServed", "minCreditFico", "minTimeInBusinessMonths", "industriesAvoided", "parentCompany", "preferredDealMin", "preferredDealMax"],
+    "low": ["shortName", "originationsContact", "originationsEmail", "originationsPhone", "tier", "appetiteSignals"]
+  },
+
+  "crawl_refresh_schedule": {
+    "appetiteSignals": "daily",
+    "minDealSize_maxDealSize": "weekly",
+    "industriesFavored": "weekly",
+    "approvalSpeed": "monthly",
+    "brokerFriendly": "monthly",
+    "minCreditFico": "monthly",
+    "lenderType": "quarterly",
+    "hqCountry": "quarterly",
+    "website": "weekly"
+  },
+
+  "validation_rules": [
+    "minDealSize must be less than maxDealSize",
+    "preferredDealMin must be >= minDealSize if set",
+    "preferredDealMax must be <= maxDealSize if set",
+    "confidenceScore must be between 0 and 100",
+    "sources array must have at least 1 entry",
+    "countriesServed must have at least 1 entry",
+    "lendingProducts must have at least 1 entry",
+    "industriesFavored must have at least 1 entry",
+    "appetiteSignals.type must be one of: positive, caution, negative",
+    "All date fields must be valid ISO 8601"
+  ]
+}
