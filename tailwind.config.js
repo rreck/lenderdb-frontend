@@ -5,16 +5,16 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "#2563eb",
+          DEFAULT: "#6366f1",
           foreground: "#ffffff",
         },
-        foreground: "#0f172a",
+        foreground: "#ffffff",
         muted: {
-          DEFAULT: "#f1f5f9",
-          foreground: "#64748b",
+          DEFAULT: "#141414",
+          foreground: "#71717a",
         },
-        border: "#e2e8f0",
-        background: "#f8fafc",
+        border: "#27272a",
+        background: "#000000",
       },
     },
   },

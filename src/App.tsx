@@ -6,6 +6,7 @@ import {
   DealMatcherPage,
   MarketIntelligencePage,
   WatchlistPage,
+  CrawlerPage,
 } from "@/pages"
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="match" element={<DealMatcherPage />} />
           <Route path="market" element={<MarketIntelligencePage />} />
           <Route path="watchlist" element={<WatchlistPage />} />
+          <Route path="crawler" element={<CrawlerPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

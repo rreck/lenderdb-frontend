@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Filter, SlidersHorizontal, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react"
+import { Search, Filter, SlidersHorizontal, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Clock, BadgeCheck } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -67,6 +67,7 @@ export function LendersPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const lastPollTime = useRef<string>(new Date().toISOString())
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null)
+  const [lastChecked, setLastChecked] = useState<Date | null>(null)
 
   const fetchLenders = useCallback(async () => {
     setLoading(true)
@@ -77,6 +78,7 @@ export function LendersPage() {
     setDbTotal(result.total)
     setOffset(result.lenders.length)
     lastPollTime.current = new Date().toISOString()
+    setLastChecked(new Date())
     setLoading(false)
   }, [filters])
 
@@ -93,23 +95,25 @@ export function LendersPage() {
     setLoadingMore(false)
   }, [filters, hasMore, loadingMore, offset])
 
-  // Poll for newly enriched lenders every 30s, merge into list
-  useEffect(() => {
-    const poll = async () => {
-      const since = lastPollTime.current
-      lastPollTime.current = new Date().toISOString()
-      const result = await apiService.getLenders({ updatedAfter: since })
-      if (result.lenders.length === 0) return
-      setDbTotal(result.total)
-      setLenders(prev => {
-        const byId = new Map(prev.map(l => [l.id, l]))
-        for (const l of result.lenders) byId.set(l.id, l)
-        return [...byId.values()]
-      })
-    }
-    const id = setInterval(poll, POLL_MS)
-    return () => clearInterval(id)
+  // Poll for newly enriched lenders — also callable on demand
+  const pollUpdates = useCallback(async () => {
+    const since = lastPollTime.current
+    lastPollTime.current = new Date().toISOString()
+    const result = await apiService.getLenders({ updatedAfter: since })
+    setLastChecked(new Date())
+    if (result.lenders.length === 0) return
+    setDbTotal(result.total)
+    setLenders(prev => {
+      const byId = new Map(prev.map(l => [l.id, l]))
+      for (const l of result.lenders) byId.set(l.id, l)
+      return [...byId.values()]
+    })
   }, [])
+
+  useEffect(() => {
+    const id = setInterval(pollUpdates, POLL_MS)
+    return () => clearInterval(id)
+  }, [pollUpdates])
 
   // Poll crawler status every 5s
   useEffect(() => {
@@ -213,6 +217,7 @@ export function LendersPage() {
     filters.riskTolerances?.length,
     filters.approvalSpeeds?.length,
     filters.brokerFriendlyOnly,
+    filters.verifiedOnly,
     filters.minConfidenceScore,
     filters.countries?.length,
   ].filter(Boolean).length
@@ -316,6 +321,14 @@ export function LendersPage() {
               {activeFilterCount}
             </span>
           )}
+        </Button>
+        <Button
+          variant={filters.verifiedOnly ? "default" : "outline"}
+          className="gap-2"
+          onClick={() => setFilters(prev => ({ ...prev, verifiedOnly: !prev.verifiedOnly }))}
+        >
+          <BadgeCheck className="h-4 w-4" />
+          Verified Only
         </Button>
         <Button
           variant="outline"
@@ -478,6 +491,24 @@ export function LendersPage() {
         </div>
       )}
 
+      {/* Last-checked banner + top pagination */}
+      <div className="flex items-center justify-between mb-3 min-h-[28px]">
+        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+          <Clock className="h-3 w-3" />
+          {lastChecked
+            ? <>Checked <span className="text-zinc-400">{lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span></>
+            : "Waiting for first check…"
+          }
+        </div>
+        {hasMore && (
+          <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="gap-1.5 text-xs h-7">
+            {loadingMore ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+            Load more
+            {dbTotal !== null && <span className="text-zinc-500">({dbTotal - lenders.length} remaining)</span>}
+          </Button>
+        )}
+      </div>
+
       {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
@@ -498,7 +529,14 @@ export function LendersPage() {
                 isWatched={watchedIds.has(lender.id)}
                 onClick={() => navigate(`/lenders/${lender.id}`)}
                 onWatchToggle={(e) => handleWatchToggle(e, lender.id)}
-                onCrawl={async (e) => { e.stopPropagation(); await apiService.crawlLender(lender.id) }}
+                onCrawl={async (e) => {
+                  e.stopPropagation()
+                  await apiService.crawlLender(lender.id)
+                  // Poll at 20s, 40s, 70s after sending — crawler takes 15-40s
+                  setTimeout(() => pollUpdates(), 20000)
+                  setTimeout(() => pollUpdates(), 40000)
+                  setTimeout(() => pollUpdates(), 70000)
+                }}
               />
             ))}
           </div>

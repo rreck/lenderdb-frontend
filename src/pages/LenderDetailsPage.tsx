@@ -103,6 +103,7 @@ export function LenderDetailsPage() {
   const [watchEntry, setWatchEntry] = useState<WatchlistEntry | null>(null)
   const [crawling, setCrawling] = useState(false)
   const [crawlSent, setCrawlSent] = useState(false)
+  const [crawlPolling, setCrawlPolling] = useState(false)
 
   useEffect(() => {
     if (!lenderId) return
@@ -196,14 +197,25 @@ export function LenderDetailsPage() {
               variant="outline"
               size="sm"
               className={cn("gap-2 transition-colors", crawlSent && "border-green-600 text-green-400 hover:text-green-400")}
-              disabled={crawling || crawlSent}
+              disabled={crawling || crawlSent || crawlPolling}
               onClick={async () => {
                 if (!lender) return
                 setCrawling(true)
                 await apiService.crawlLender(lender.id).catch(() => {})
                 setCrawling(false)
                 setCrawlSent(true)
-                setTimeout(() => setCrawlSent(false), 4000)
+                // Poll for updated data every 10s for up to 90s
+                setCrawlPolling(true)
+                const start = Date.now()
+                const poll = setInterval(async () => {
+                  const updated = await apiService.getLender(lender.id).catch(() => null)
+                  if (updated) setLender(updated)
+                  if (Date.now() - start > 90000) {
+                    clearInterval(poll)
+                    setCrawlPolling(false)
+                    setCrawlSent(false)
+                  }
+                }, 10000)
               }}
             >
               {crawling
@@ -212,7 +224,7 @@ export function LenderDetailsPage() {
                   ? <Check className="h-4 w-4" />
                   : <RefreshCw className="h-4 w-4" />
               }
-              {crawling ? "Sending…" : crawlSent ? "Sent to crawler" : "Enrich"}
+              {crawling ? "Sending…" : crawlSent ? "Sent to crawler" : crawlPolling ? "Waiting for update…" : "Enrich"}
             </Button>
             <Button size="sm" onClick={() => navigate(`/match`)}>
               Run Deal Match

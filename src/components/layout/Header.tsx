@@ -1,5 +1,6 @@
+import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Star, Bell } from "lucide-react"
+import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -7,20 +8,20 @@ const navItems = [
   { name: "Deal Matcher", path: "/match", icon: Zap },
   { name: "Market Intel", path: "/market", icon: BarChart3 },
   { name: "Watchlist", path: "/watchlist", icon: Star },
+  { name: "Crawler", path: "/crawler", icon: Bot },
 ]
 
 export function Header() {
   const location = useLocation()
+  const [chatOpen, setChatOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-gray-950 text-white">
+    <header className="sticky top-0 z-50 w-full border-b border-zinc-800 bg-black text-white">
       <div className="flex h-14 items-center px-6">
         {/* Logo */}
         <div className="flex items-center gap-3 mr-8">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-              <Database className="h-4 w-4 text-white" />
-            </div>
+            <Database className="h-4 w-4 text-primary" />
             <span className="text-sm font-bold tracking-tight">LenderDB</span>
           </div>
           <span className="text-[11px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
@@ -56,6 +57,16 @@ export function Header() {
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-3">
+          <button
+            onClick={() => setChatOpen(o => !o)}
+            className={cn(
+              "relative h-8 w-8 flex items-center justify-center rounded-lg transition-colors",
+              chatOpen ? "bg-primary text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
+            )}
+            title="Chat"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
           <button className="relative h-8 w-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
             <Bell className="h-4 w-4" />
             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
@@ -65,6 +76,19 @@ export function Header() {
           </div>
         </div>
       </div>
+
+      {/* Chat panel — floats below header, does not affect layout */}
+      {chatOpen && (
+        <div className="absolute right-4 top-[57px] z-50 w-80 h-96 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+            <span className="text-sm font-semibold text-white">Chat</span>
+            <button onClick={() => setChatOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1" />
+        </div>
+      )}
     </header>
   )
 }

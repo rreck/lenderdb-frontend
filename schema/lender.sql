@@ -30,7 +30,11 @@ CREATE TYPE loan_type AS ENUM (
   'trac_lease',
   'fmv_lease',
   'line_of_credit',
-  'working_capital'
+  'working_capital',
+  'conditional_sale',       -- ELFA: Conditional Sale / Money-Over-Money
+  'municipal_lease',        -- ELFA: Tax-Exempt Municipal Lease
+  'leveraged_lease',        -- ELFA: Leveraged Lease
+  'real_estate_lease'       -- ELFA: Real Estate
 );
 
 CREATE TYPE borrower_type AS ENUM (
@@ -217,11 +221,11 @@ CREATE TABLE lender_equipment_types (
 
 CREATE TABLE lender_regions (
   lender_id         UUID NOT NULL REFERENCES lenders(id) ON DELETE CASCADE,
-  country           CHAR(2),             -- ISO alpha-2, NULL if state-level only
-  state_province    CHAR(3),             -- e.g. TX, CA, ON
-  region_label      TEXT,                -- e.g. 'Southeast Asia', 'DACH'
+  country           CHAR(2)  NOT NULL DEFAULT '',   -- ISO alpha-2, '' if state-level only
+  state_province    CHAR(3)  NOT NULL DEFAULT '',   -- e.g. TX, CA, ON; '' if country-level only
+  region_label      TEXT,                           -- e.g. 'Southeast Asia', 'DACH'
   allowed           BOOLEAN NOT NULL DEFAULT TRUE,  -- FALSE = explicitly excluded
-  PRIMARY KEY (lender_id, COALESCE(country,''), COALESCE(state_province,''))
+  PRIMARY KEY (lender_id, country, state_province)
 );
 
 -- ============================================================
@@ -293,6 +297,52 @@ CREATE TABLE lender_sources (
 );
 
 -- ============================================================
+-- FUNDING PROGRAMS (ELFA: FsFundingProgramsNames)
+-- How the lender participates in the broker/intermediary market.
+-- ============================================================
+
+CREATE TABLE lender_funding_programs (
+  lender_id   UUID NOT NULL REFERENCES lenders(id) ON DELETE CASCADE,
+  program     TEXT NOT NULL,   -- e.g. "Buy Paper from Brokers", "Discount-Nonrecourse",
+                               --      "Purchase Portfolios", "Warehouse Lines",
+                               --      "Securitizations", "Inventory Financing / Floor Plan"
+  PRIMARY KEY (lender_id, program)
+);
+
+-- ============================================================
+-- CREDIT CRITERIA (ELFA: FsCreditCriteriaNames)
+-- Credit market segments the lender actively serves.
+-- ============================================================
+
+CREATE TABLE lender_credit_criteria (
+  lender_id UUID NOT NULL REFERENCES lenders(id) ON DELETE CASCADE,
+  criterion TEXT NOT NULL,   -- e.g. "Investment Grade", "Middle Market",
+                             --      "Near Investment Grade", "Lower Middle Market", "HLT"
+  PRIMARY KEY (lender_id, criterion)
+);
+
+-- ============================================================
+-- RESEARCH SOURCES / CRAWL PROVENANCE (global, not per-lender)
+-- Tracks every URL crawled during research, with links to
+-- the lenders found at that source.
+-- ============================================================
+
+CREATE TABLE research_sources (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  url             TEXT NOT NULL,
+  source_type     data_source_type NOT NULL DEFAULT 'web_crawl',
+  title           TEXT,
+  crawled_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  http_status     INTEGER,
+  content_hash    TEXT,
+  lender_ids      UUID[],           -- lenders found/mentioned at this URL
+  data_extracted  JSONB,            -- raw extracted fields
+  notes           TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (url)
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 
@@ -326,6 +376,11 @@ CREATE INDEX idx_regions_country     ON lender_regions(country);
 CREATE INDEX idx_signals_lender      ON appetite_signals(lender_id);
 CREATE INDEX idx_signals_active      ON appetite_signals(lender_id, is_active, detected_at DESC);
 CREATE INDEX idx_sources_lender      ON lender_sources(lender_id);
+CREATE INDEX idx_funding_programs_lender    ON lender_funding_programs(lender_id);
+CREATE INDEX idx_credit_criteria_lender     ON lender_credit_criteria(lender_id);
+CREATE INDEX idx_research_sources_crawled_at ON research_sources(crawled_at DESC);
+CREATE INDEX idx_research_sources_lender_ids ON research_sources USING GIN(lender_ids);
+CREATE INDEX idx_research_sources_type ON research_sources(source_type);
 CREATE INDEX idx_deals_lender        ON historical_deals(lender_id);
 CREATE INDEX idx_jurisdictions_lender ON lender_jurisdictions(lender_id);
 
@@ -344,6 +399,25 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_lenders_updated_at
   BEFORE UPDATE ON lenders
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Propagate updated_at to parent lender when related tables change
+
+CREATE OR REPLACE FUNCTION touch_lender_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE lenders SET updated_at = NOW()
+  WHERE id = COALESCE(NEW.lender_id, OLD.lender_id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_funding_programs_touch
+  AFTER INSERT OR UPDATE OR DELETE ON lender_funding_programs
+  FOR EACH ROW EXECUTE FUNCTION touch_lender_updated_at();
+
+CREATE TRIGGER trg_credit_criteria_touch
+  AFTER INSERT OR UPDATE OR DELETE ON lender_credit_criteria
+  FOR EACH ROW EXECUTE FUNCTION touch_lender_updated_at();
 
 -- ============================================================
 -- DEAL MATCHING VIEW

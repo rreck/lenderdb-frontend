@@ -1,4 +1,4 @@
-import { Building2, TrendingUp, Star, Shield, ExternalLink, RefreshCw, Check } from "lucide-react"
+import { Building2, TrendingUp, Star, Shield, ExternalLink, RefreshCw, Check, BadgeCheck } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import type { Lender } from "@/api/types"
@@ -86,6 +86,10 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
             <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", tierColor(lender.tier))}>
               T{lender.tier}
             </span>
+            {lender.status === "active"
+              ? <span className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/50"><BadgeCheck className="h-3 w-3" />Verified</span>
+              : <span className="text-[10px] text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/30">Unverified</span>
+            }
             {favicon ? (
               <img
                 src={favicon}

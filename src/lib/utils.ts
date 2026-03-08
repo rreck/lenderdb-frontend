@@ -19,6 +19,19 @@ export function daysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
 }
 
+export function formatRelativeDate(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  const timeStr = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  if (date.toDateString() === now.toDateString()) return `today at ${timeStr}`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return `yesterday at ${timeStr}`
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86_400_000)
+  if (diffDays < 7) return `${diffDays} days ago`
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 export function labelLenderType(t: string): string {
   const map: Record<string, string> = {
     bank: "Bank",

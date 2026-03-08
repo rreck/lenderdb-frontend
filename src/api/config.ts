@@ -1,6 +1,6 @@
 export const API_CONFIG = {
-  baseUrl: import.meta.env.VITE_API_BASE_URL || "https://api.lenderdb.io/v1",
-  isLocalMode: import.meta.env.VITE_LOCAL_MODE === "true" || true, // default local for dev
+  baseUrl: import.meta.env.VITE_API_BASE_URL || "/api",
+  isLocalMode: import.meta.env.VITE_LOCAL_MODE === "true",
 }
 
 export const API_ENDPOINTS = {
