@@ -205,29 +205,27 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
         </div>
       </div>
 
-      {/* Updated at + Enrich button */}
-      {(() => {
+      {/* Enrich button with color-coded date */}
+      {onCrawl && (() => {
         const meta = updatedAtMeta(lender.updatedAt)
         const dateStr = new Date(lender.updatedAt).toISOString().slice(0, 10)
         return (
-          {onCrawl && (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                setCrawling(true)
-                await onCrawl(e).catch(() => {})
-                setCrawling(false)
-              }}
-              disabled={crawling}
-              className="mt-2 w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-md border border-zinc-700 text-xs text-zinc-300 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-            >
-              <div className="flex items-center gap-1.5">
-                <RefreshCw className={cn("h-3.5 w-3.5", crawling && "animate-spin text-primary")} />
-                {crawling ? "Queued…" : "Enrich"}
-              </div>
-              <span className={cn("text-[11px] font-mono", meta.color)}>{dateStr}</span>
-            </button>
-          )}
+          <button
+            onClick={async (e) => {
+              e.stopPropagation()
+              setCrawling(true)
+              await onCrawl(e).catch(() => {})
+              setCrawling(false)
+            }}
+            disabled={crawling}
+            className="mt-2 w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-md border border-zinc-700 text-xs text-zinc-300 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+          >
+            <div className="flex items-center gap-1.5">
+              <RefreshCw className={cn("h-3.5 w-3.5", crawling && "animate-spin text-primary")} />
+              {crawling ? "Queued…" : "Enrich"}
+            </div>
+            <span className={cn("text-[11px] font-mono", meta.color)}>{dateStr}</span>
+          </button>
         )
       })()}
     </div>
