@@ -119,33 +119,16 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
             )}
           </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          {onCrawl && (
-            <button
-              onClick={async (e) => {
-                e.stopPropagation()
-                setCrawling(true)
-                await onCrawl(e).catch(() => {})
-                setCrawling(false)
-              }}
-              disabled={crawling}
-              className="p-1 rounded transition-colors opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-primary disabled:opacity-50"
-              title="Send to crawler"
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", crawling && "animate-spin text-primary")} />
-            </button>
+        <button
+          onClick={onWatchToggle}
+          className={cn(
+            "p-1 rounded transition-colors opacity-0 group-hover:opacity-100",
+            isWatched ? "opacity-100 text-yellow-400" : "text-zinc-600 hover:text-yellow-400"
           )}
-          <button
-            onClick={onWatchToggle}
-            className={cn(
-              "p-1 rounded transition-colors opacity-0 group-hover:opacity-100",
-              isWatched ? "opacity-100 text-yellow-400" : "text-zinc-600 hover:text-yellow-400"
-            )}
-            title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
-          >
-            <Star className={cn("h-4 w-4", isWatched && "fill-yellow-400")} />
-          </button>
-        </div>
+          title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
+        >
+          <Star className={cn("h-4 w-4", isWatched && "fill-yellow-400")} />
+        </button>
       </div>
 
       {/* Deal range */}
@@ -222,13 +205,30 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
         </div>
       </div>
 
-      {/* Updated at */}
+      {/* Updated at + Enrich button */}
       {(() => {
         const meta = updatedAtMeta(lender.updatedAt)
         return (
-          <div className="flex items-center gap-1 mt-1.5">
-            <div className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
-            <span className={cn("text-[10px]", meta.color)}>updated {meta.label}</span>
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-1">
+              <div className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+              <span className={cn("text-[10px]", meta.color)}>updated {meta.label}</span>
+            </div>
+            {onCrawl && (
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  setCrawling(true)
+                  await onCrawl(e).catch(() => {})
+                  setCrawling(false)
+                }}
+                disabled={crawling}
+                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={cn("h-2.5 w-2.5", crawling && "animate-spin text-primary")} />
+                {crawling ? "Queued" : "Enrich"}
+              </button>
+            )}
           </div>
         )
       })()}
