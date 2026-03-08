@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { ArrowLeft, Building2, Globe, Phone, Mail, Star, Shield, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, MapPin, RefreshCw, Check } from "lucide-react"
+import { ArrowLeft, Building2, Globe, Phone, Mail, Star, Shield, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, MapPin, RefreshCw, Check, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -104,6 +104,9 @@ export function LenderDetailsPage() {
   const [crawling, setCrawling] = useState(false)
   const [crawlSent, setCrawlSent] = useState(false)
   const [crawlPolling, setCrawlPolling] = useState(false)
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null)
+  const [screenshotLoading, setScreenshotLoading] = useState(false)
+  const [screenshotError, setScreenshotError] = useState(false)
 
   useEffect(() => {
     if (!lenderId) return
@@ -116,7 +119,30 @@ export function LenderDetailsPage() {
       setWatchEntry(wl.find(e => e.lenderId === lenderId) ?? null)
       setLoading(false)
     })
+    // Check if screenshot exists
+    const url = `/api/lenders/${lenderId}/screenshot`
+    fetch(url, { method: "HEAD" }).then(r => {
+      if (r.ok) setScreenshotUrl(url + "?t=" + Date.now())
+    }).catch(() => {})
   }, [lenderId])
+
+  const handleTakeScreenshot = async () => {
+    if (!lenderId) return
+    setScreenshotLoading(true)
+    setScreenshotError(false)
+    try {
+      const r = await fetch(`/api/lenders/${lenderId}/screenshot`, { method: "POST" })
+      if (r.ok) {
+        setScreenshotUrl(`/api/lenders/${lenderId}/screenshot?t=` + Date.now())
+      } else {
+        setScreenshotError(true)
+      }
+    } catch {
+      setScreenshotError(true)
+    } finally {
+      setScreenshotLoading(false)
+    }
+  }
 
   const handleWatchToggle = async () => {
     if (!lender) return
@@ -268,6 +294,49 @@ export function LenderDetailsPage() {
             </p>
           </div>
         </div>
+
+        {/* Website Screenshot */}
+        {lender.website && (
+          <div className="bg-zinc-900 rounded-xl border border-zinc-800 mb-6 overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm font-medium text-white">Website Preview</span>
+                <a href={lender.website} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-primary">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs"
+                disabled={screenshotLoading}
+                onClick={handleTakeScreenshot}
+              >
+                {screenshotLoading
+                  ? <RefreshCw className="h-3 w-3 animate-spin" />
+                  : <Camera className="h-3 w-3" />
+                }
+                {screenshotLoading ? "Capturing…" : screenshotUrl ? "Refresh" : "Capture"}
+              </Button>
+            </div>
+            {screenshotUrl ? (
+              <img
+                src={screenshotUrl}
+                alt={`${lender.name} website`}
+                className="w-full object-cover max-h-80"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-32 gap-2 text-zinc-600">
+                <Camera className="h-8 w-8" />
+                {screenshotError
+                  ? <span className="text-xs text-red-500">Screenshot failed — site may be blocking automated browsers</span>
+                  : <span className="text-xs">No screenshot yet — click Capture to take one</span>
+                }
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800">

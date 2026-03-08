@@ -82,14 +82,15 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-0.5">
-            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", tierColor(lender.tier))}>
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+            <h3 className="text-sm font-semibold text-white truncate">{lender.name}</h3>
+            {lender.status === "active"
+              ? <span className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/50 shrink-0"><BadgeCheck className="h-3 w-3" />Verified</span>
+              : <span className="text-[10px] text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/30 shrink-0">Unverified</span>
+            }
+            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0", tierColor(lender.tier))}>
               T{lender.tier}
             </span>
-            {lender.status === "active"
-              ? <span className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/50"><BadgeCheck className="h-3 w-3" />Verified</span>
-              : <span className="text-[10px] text-zinc-600 bg-zinc-800/50 px-1.5 py-0.5 rounded border border-zinc-700/30">Unverified</span>
-            }
             {favicon ? (
               <img
                 src={favicon}
@@ -106,7 +107,6 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
               />
             ) : null}
             {!favicon && <Building2 className="h-4 w-4 text-zinc-600 shrink-0" />}
-            <h3 className="text-sm font-semibold text-white truncate">{lender.name}</h3>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <p className="text-xs text-zinc-500">{labelLenderType(lender.lenderType)}</p>
