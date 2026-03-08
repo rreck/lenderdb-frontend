@@ -208,7 +208,8 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
       {/* Enrich button with color-coded date */}
       {onCrawl && (() => {
         const meta = updatedAtMeta(lender.updatedAt)
-        const dateStr = new Date(lender.updatedAt).toISOString().slice(0, 10)
+        const iso = new Date(lender.updatedAt).toISOString()
+        const dateStr = iso.slice(0, 10) + " " + iso.slice(11, 16) + "Z"
         return (
           <button
             onClick={async (e) => {
