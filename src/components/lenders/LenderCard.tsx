@@ -1,4 +1,4 @@
-import { Building2, TrendingUp, Star, Shield, ExternalLink, RefreshCw } from "lucide-react"
+import { Building2, TrendingUp, Star, Shield, ExternalLink, RefreshCw, Check } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import type { Lender } from "@/api/types"
@@ -69,6 +69,7 @@ function updatedAtMeta(updatedAt: string): { dot: string; color: string; label: 
 
 export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl }: LenderCardProps) {
   const [crawling, setCrawling] = useState(false)
+  const [crawlSent, setCrawlSent] = useState(false)
   const latestSignal = lender.appetiteSignals
     .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())[0]
   const favicon = logoUrl(lender.website)
@@ -217,13 +218,25 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
               setCrawling(true)
               await onCrawl(e).catch(() => {})
               setCrawling(false)
+              setCrawlSent(true)
+              setTimeout(() => setCrawlSent(false), 4000)
             }}
-            disabled={crawling}
-            className="mt-2 w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-md border border-zinc-700 text-xs text-zinc-300 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+            disabled={crawling || crawlSent}
+            className={cn(
+              "mt-2 w-full flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-md border text-xs transition-colors",
+              crawlSent
+                ? "border-green-600 text-green-400 bg-green-950/30"
+                : "border-zinc-700 text-zinc-300 hover:border-primary hover:text-primary hover:bg-primary/5 disabled:opacity-50"
+            )}
           >
             <div className="flex items-center gap-1.5">
-              <RefreshCw className={cn("h-3.5 w-3.5", crawling && "animate-spin text-primary")} />
-              {crawling ? "Queued…" : "Enrich"}
+              {crawling
+                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                : crawlSent
+                  ? <Check className="h-3.5 w-3.5" />
+                  : <RefreshCw className="h-3.5 w-3.5" />
+              }
+              {crawling ? "Sending…" : crawlSent ? "Sent to crawler" : "Enrich"}
             </div>
             <span className={cn("text-[11px] font-mono", meta.color)}>{dateStr}</span>
           </button>
