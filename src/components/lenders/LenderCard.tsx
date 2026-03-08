@@ -208,11 +208,12 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
       {/* Updated at + Enrich button */}
       {(() => {
         const meta = updatedAtMeta(lender.updatedAt)
+        const dateStr = new Date(lender.updatedAt).toISOString().slice(0, 10)
         return (
-          <div className="flex items-center justify-between mt-1.5">
+          <div className="mt-2 flex flex-col gap-2">
             <div className="flex items-center gap-1">
-              <div className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
-              <span className={cn("text-[10px]", meta.color)}>updated {meta.label}</span>
+              <div className={cn("h-1.5 w-1.5 rounded-full shrink-0", meta.dot)} />
+              <span className={cn("text-[11px]", meta.color)}>Updated {dateStr}</span>
             </div>
             {onCrawl && (
               <button
@@ -223,10 +224,10 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
                   setCrawling(false)
                 }}
                 disabled={crawling}
-                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md border border-zinc-700 text-xs text-zinc-300 hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
               >
-                <RefreshCw className={cn("h-2.5 w-2.5", crawling && "animate-spin text-primary")} />
-                {crawling ? "Queued" : "Enrich"}
+                <RefreshCw className={cn("h-3.5 w-3.5", crawling && "animate-spin text-primary")} />
+                {crawling ? "Queued for enrichment…" : "Enrich this record"}
               </button>
             )}
           </div>
