@@ -2,7 +2,7 @@ import { API_CONFIG, API_ENDPOINTS, type RequestOptions } from "./config"
 import { localStorageService, initializeLocalStorage } from "./localStorage"
 import { matchLenders } from "./matcher"
 import { MOCK_LENDERS } from "@/data/mockLenders"
-import type { Lender, WatchlistEntry, DealProfile, DealMatchResult, LenderFilters, MarketSummary } from "./types"
+import type { Lender, LenderPage, CrawlerStatus, WatchlistEntry, DealProfile, DealMatchResult, LenderFilters, MarketSummary } from "./types"
 
 if (API_CONFIG.isLocalMode) {
   initializeLocalStorage()
@@ -30,10 +30,13 @@ export const apiService = {
   // ==========================================
   // Lenders
   // ==========================================
-  async getLenders(filters?: LenderFilters): Promise<Lender[]> {
-    if (API_CONFIG.isLocalMode) return localStorageService.getLenders(filters)
+  async getLenders(filters?: LenderFilters): Promise<LenderPage> {
+    if (API_CONFIG.isLocalMode) {
+      const lenders = localStorageService.getLenders(filters)
+      return { lenders, total: lenders.length, hasMore: false, offset: 0 }
+    }
     const params = filters ? `?${new URLSearchParams(filters as Record<string, string>)}` : ""
-    const res = await httpClient<{ data: Lender[] }>(`${API_ENDPOINTS.lenders.list}${params}`)
+    const res = await httpClient<{ data: LenderPage }>(`${API_ENDPOINTS.lenders.list}${params}`)
     return res.data
   },
 
@@ -93,6 +96,25 @@ export const apiService = {
     if (API_CONFIG.isLocalMode) return localStorageService.getMarketSummary()
     const res = await httpClient<{ data: MarketSummary }>(API_ENDPOINTS.market.summary)
     return res.data
+  },
+
+  // ==========================================
+  // Crawler
+  // ==========================================
+  async getCrawlerStatus(): Promise<CrawlerStatus> {
+    if (API_CONFIG.isLocalMode) return { status: "idle" }
+    const res = await httpClient<{ data: CrawlerStatus }>("/crawler/status")
+    return res.data
+  },
+
+  async triggerEnrichment(): Promise<void> {
+    if (API_CONFIG.isLocalMode) return
+    await httpClient("/batch", { method: "POST" })
+  },
+
+  async crawlLender(lenderId: string): Promise<void> {
+    if (API_CONFIG.isLocalMode) return
+    await httpClient(`${API_ENDPOINTS.lenders.get(lenderId)}/crawl`, { method: "POST" })
   },
 
   // ==========================================

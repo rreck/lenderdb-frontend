@@ -71,6 +71,7 @@ export interface Lender {
   website?: string
   hqCountry: string
   hqState?: string
+  hqCity?: string
 
   // Deal parameters
   minDealSize: number  // USD
@@ -105,6 +106,10 @@ export interface Lender {
   originationsPhone?: string
   brokerFriendly: boolean
   brokerRegistrationRequired: boolean
+
+  // ELFA enrichment
+  fundingPrograms?: string[]   // e.g. "Buy Paper from Brokers", "Discount-Nonrecourse"
+  creditCriteria?: string[]    // e.g. "Investment Grade", "Middle Market"
 
   // Data quality
   lastVerifiedDate: string
@@ -203,6 +208,28 @@ export interface LenderFilters {
   lendingProducts?: LendingProduct[]
   brokerFriendlyOnly?: boolean
   minConfidenceScore?: number
+  limit?: number
+  offset?: number
+  updatedAfter?: string
+}
+
+export interface LenderPage {
+  lenders: Lender[]
+  total: number
+  hasMore: boolean
+  offset: number
+}
+
+export interface CrawlerStatus {
+  status: "running" | "idle" | "unreachable"
+  current_lender?: string
+  last_run?: string
+  batch_progress?: {
+    done: number
+    total: number
+    errors: number
+  }
+  error?: string
 }
 
 // ============================================
