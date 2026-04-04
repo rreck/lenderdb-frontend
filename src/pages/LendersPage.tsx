@@ -72,27 +72,37 @@ export function LendersPage() {
   const fetchLenders = useCallback(async () => {
     setLoading(true)
     setOffset(0)
-    const result = await apiService.getLenders({ ...filters, limit: PAGE_SIZE, offset: 0 })
-    setLenders(result.lenders)
-    setHasMore(result.hasMore)
-    setDbTotal(result.total)
-    setOffset(result.lenders.length)
-    lastPollTime.current = new Date().toISOString()
-    setLastChecked(new Date())
-    setLoading(false)
+    try {
+      const result = await apiService.getLenders({ ...filters, limit: PAGE_SIZE, offset: 0 })
+      setLenders(result.lenders)
+      setDbTotal(result.total)
+      setHasMore(result.lenders.length < result.total)
+      setOffset(result.lenders.length)
+      lastPollTime.current = new Date().toISOString()
+      setLastChecked(new Date())
+    } catch (e) {
+      console.error("fetchLenders failed", e)
+    } finally {
+      setLoading(false)
+    }
   }, [filters])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
-    const result = await apiService.getLenders({ ...filters, limit: PAGE_SIZE, offset })
-    setLenders(prev => {
-      const ids = new Set(prev.map(l => l.id))
-      return [...prev, ...result.lenders.filter(l => !ids.has(l.id))]
-    })
-    setHasMore(result.hasMore)
-    setOffset(prev => prev + result.lenders.length)
-    setLoadingMore(false)
+    try {
+      const result = await apiService.getLenders({ ...filters, limit: PAGE_SIZE, offset })
+      setLenders(prev => {
+        const ids = new Set(prev.map(l => l.id))
+        return [...prev, ...result.lenders.filter(l => !ids.has(l.id))]
+      })
+      setHasMore(result.lenders.length < result.total)
+      setOffset(prev => prev + result.lenders.length)
+    } catch (e) {
+      console.error("loadMore failed", e)
+    } finally {
+      setLoadingMore(false)
+    }
   }, [filters, hasMore, loadingMore, offset])
 
   // Poll for newly enriched lenders — also callable on demand

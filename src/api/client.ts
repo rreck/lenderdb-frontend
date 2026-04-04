@@ -39,8 +39,7 @@ export const apiService = {
     const res = await httpClient<{ data: Lender[]; total: number }>(`${API_ENDPOINTS.lenders.list}${params}`)
     const lenders = res.data ?? []
     const total = res.total ?? lenders.length
-    const requestedLimit = filters?.limit ?? 50
-    return { lenders, total, hasMore: lenders.length >= requestedLimit, offset: filters?.offset ?? 0 }
+    return { lenders, total, hasMore: lenders.length < total, offset: filters?.offset ?? 0 }
   },
 
   async getLender(id: string): Promise<Lender | null> {
