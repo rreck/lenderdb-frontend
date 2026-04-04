@@ -259,9 +259,13 @@ export function LendersPage() {
             className="gap-2"
             disabled={crawlerStatus?.status === "running"}
             onClick={async () => {
-              await apiService.triggerEnrichment()
-              const s = await apiService.getCrawlerStatus()
-              setCrawlerStatus(s)
+              try {
+                await apiService.triggerEnrichment()
+                const s = await apiService.getCrawlerStatus()
+                setCrawlerStatus(s)
+              } catch (e) {
+                console.error("Enrich failed", e)
+              }
             }}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${crawlerStatus?.status === "running" ? "animate-spin" : ""}`} />
