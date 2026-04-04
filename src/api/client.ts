@@ -36,8 +36,11 @@ export const apiService = {
       return { lenders, total: lenders.length, hasMore: false, offset: 0 }
     }
     const params = filters ? `?${new URLSearchParams(filters as Record<string, string>)}` : ""
-    const res = await httpClient<{ data: LenderPage }>(`${API_ENDPOINTS.lenders.list}${params}`)
-    return res.data
+    const res = await httpClient<{ data: Lender[]; total: number }>(`${API_ENDPOINTS.lenders.list}${params}`)
+    const lenders = res.data ?? []
+    const total = res.total ?? lenders.length
+    const requestedLimit = filters?.limit ?? 50
+    return { lenders, total, hasMore: lenders.length >= requestedLimit, offset: filters?.offset ?? 0 }
   },
 
   async getLender(id: string): Promise<Lender | null> {
