@@ -207,6 +207,7 @@ export interface LenderFilters {
   approvalSpeeds?: ApprovalSpeed[]
   lendingProducts?: LendingProduct[]
   brokerFriendlyOnly?: boolean
+  rcrOnly?: boolean
   verifiedOnly?: boolean
   minConfidenceScore?: number
   limit?: number

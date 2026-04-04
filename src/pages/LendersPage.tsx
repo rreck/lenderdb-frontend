@@ -218,6 +218,7 @@ export function LendersPage() {
     filters.approvalSpeeds?.length,
     filters.brokerFriendlyOnly,
     filters.verifiedOnly,
+    filters.rcrOnly,
     filters.minConfidenceScore,
     filters.countries?.length,
   ].filter(Boolean).length
@@ -337,6 +338,13 @@ export function LendersPage() {
         >
           <Filter className={`h-4 w-4 ${filters.brokerFriendlyOnly ? "text-primary" : ""}`} />
           Broker Friendly
+        </Button>
+        <Button
+          variant={filters.rcrOnly ? "default" : "outline"}
+          className="gap-2"
+          onClick={() => setFilters(prev => ({ ...prev, rcrOnly: !prev.rcrOnly }))}
+        >
+          RCR Lender
         </Button>
         <Button onClick={() => navigate("/match")} className="gap-2">
           <Search className="h-4 w-4" />
