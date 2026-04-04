@@ -359,10 +359,7 @@ export function LendersPage() {
         >
           RCR Lender
         </Button>
-        <Button onClick={() => navigate("/match")} className="gap-2">
-          <Search className="h-4 w-4" />
-          Match a Deal
-        </Button>
+
       </div>
 
       {/* Expanded filter panel */}
