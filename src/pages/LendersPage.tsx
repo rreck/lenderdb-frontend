@@ -109,16 +109,15 @@ export function LendersPage() {
   const pollUpdates = useCallback(async () => {
     const since = lastPollTime.current
     lastPollTime.current = new Date().toISOString()
-    const result = await apiService.getLenders({ updatedAfter: since })
+    const result = await apiService.getLenders({ ...filters, updatedAfter: since })
     setLastChecked(new Date())
     if (result.lenders.length === 0) return
-    setDbTotal(result.total)
     setLenders(prev => {
       const byId = new Map(prev.map(l => [l.id, l]))
       for (const l of result.lenders) byId.set(l.id, l)
       return [...byId.values()]
     })
-  }, [])
+  }, [filters])
 
   useEffect(() => {
     const id = setInterval(pollUpdates, POLL_MS)
