@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { ChevronDown, ChevronRight, RefreshCw, Loader2, Inbox } from "lucide-react"
+import { ChevronDown, ChevronRight, RefreshCw, Loader2, Inbox, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -49,8 +49,22 @@ function PayloadRow({ label, value }: { label: string; value: unknown }) {
   )
 }
 
-function LeadRow({ lead }: { lead: Lead }) {
+function LeadRow({ lead, onDelete }: { lead: Lead; onDelete: (id: string) => void }) {
   const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setDeleting(true)
+    try {
+      await fetch(`/api/leads/${lead.id}`, { method: "DELETE" })
+      onDelete(lead.id)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const colorClass = PRODUCT_COLORS[lead.product] ?? "bg-zinc-800 text-zinc-400 border-zinc-700"
   const productLabel = PRODUCT_LABELS[lead.product] ?? lead.product
@@ -83,10 +97,24 @@ function LeadRow({ lead }: { lead: Lead }) {
         <td className="px-4 py-3 text-sm text-zinc-300 text-right font-mono">
           {lead.deal_amount ? `$${lead.deal_amount}` : "—"}
         </td>
-        <td className="px-4 py-3 text-zinc-500 text-right">
+        <td className="px-4 py-3 text-right whitespace-nowrap">
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            onBlur={() => setConfirmDelete(false)}
+            className={cn(
+              "mr-2 inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+              confirmDelete
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "text-zinc-600 hover:text-red-400 hover:bg-zinc-800"
+            )}
+          >
+            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+            {confirmDelete && !deleting && "Confirm"}
+          </button>
           {open
-            ? <ChevronDown className="h-4 w-4 inline" />
-            : <ChevronRight className="h-4 w-4 inline" />}
+            ? <ChevronDown className="h-4 w-4 inline text-zinc-500" />
+            : <ChevronRight className="h-4 w-4 inline text-zinc-500" />}
         </td>
       </tr>
 
@@ -129,6 +157,10 @@ export function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<string>("all")
+
+  const handleDelete = useCallback((id: string) => {
+    setLeads(prev => prev.filter(l => l.id !== id))
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -220,7 +252,7 @@ export function LeadsPage() {
               </tr>
             </thead>
             <tbody>
-              {leads.map(lead => <LeadRow key={lead.id} lead={lead} />)}
+              {leads.map(lead => <LeadRow key={lead.id} lead={lead} onDelete={handleDelete} />)}
             </tbody>
           </table>
         </div>
