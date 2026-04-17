@@ -7,6 +7,8 @@ import {
   MarketIntelligencePage,
   WatchlistPage,
   CrawlerPage,
+  ApplyPage,
+  LeadsPage,
 } from "@/pages"
 
 function App() {
@@ -21,6 +23,8 @@ function App() {
           <Route path="market" element={<MarketIntelligencePage />} />
           <Route path="watchlist" element={<WatchlistPage />} />
           <Route path="crawler" element={<CrawlerPage />} />
+          <Route path="apply" element={<ApplyPage />} />
+          <Route path="leads" element={<LeadsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

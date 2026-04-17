@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, Bot } from "lucide-react"
+import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, Bot, ClipboardList, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -9,6 +9,8 @@ const navItems = [
   { name: "Market Intel", path: "/market", icon: BarChart3 },
   { name: "Watchlist", path: "/watchlist", icon: Star },
   { name: "Crawler", path: "/crawler", icon: Bot },
+  { name: "Apply", path: "/apply", icon: ClipboardList },
+  { name: "Leads", path: "/leads", icon: Users },
 ]
 
 export function Header() {
