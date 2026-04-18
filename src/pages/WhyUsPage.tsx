@@ -1,7 +1,25 @@
 
 
+import { Helmet } from "react-helmet-async"
 import { cn } from "@/lib/utils"
 import { Link } from "react-router-dom"
+
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "FinancialService",
+  "name": "RCR International",
+  "url": "https://finance.rrecktek.com",
+  "description": "Commercial finance broker specializing in trade finance, accounts receivable, equipment finance, and commercial real estate. $140M+ placed across 50+ verified transactions.",
+  "areaServed": ["US", "CA", "Caribbean", "GB"],
+  "serviceType": [
+    "Trade Finance",
+    "Accounts Receivable Financing",
+    "Purchase Order Financing",
+    "Equipment Finance",
+    "Commercial Real Estate Finance"
+  ],
+  "knowsAbout": "AI-powered lender matching for commercial finance"
+}
 
 // ── Verified data from rcrintl-finance.com closings (Nov 2022 – Jul 2024) ──
 const STATS = [
@@ -32,13 +50,13 @@ const PRODUCTS_VOL = [
 
 // Monthly deal counts (verified)
 const MONTHLY = [
-  { m: "N'22", n: 1 }, { m: "J'23", n: 2 }, { m: "F'23", n: 3 },
-  { m: "M'23", n: 1 }, { m: "A'23", n: 3 }, { m: "M'23", n: 3 },
-  { m: "J'23", n: 3 }, { m: "J'23", n: 4 }, { m: "A'23", n: 4 },
-  { m: "S'23", n: 5 }, { m: "O'23", n: 2 }, { m: "N'23", n: 1 },
-  { m: "D'23", n: 1 }, { m: "J'24", n: 1 }, { m: "F'24", n: 1 },
-  { m: "M'24", n: 1 }, { m: "A'24", n: 3 }, { m: "J'24", n: 4 },
-  { m: "J'24", n: 2 },
+  { m: "N", n: 1 }, { m: "J", n: 2 }, { m: "F", n: 3 },
+  { m: "M", n: 1 }, { m: "A", n: 3 }, { m: "M", n: 3 },
+  { m: "J", n: 3 }, { m: "J", n: 4 }, { m: "A", n: 4 },
+  { m: "S", n: 5 }, { m: "O", n: 2 }, { m: "N", n: 1 },
+  { m: "D", n: 1 }, { m: "J", n: 1 }, { m: "F", n: 1 },
+  { m: "M", n: 1 }, { m: "A", n: 3 }, { m: "J", n: 4 },
+  { m: "J", n: 2 },
 ]
 
 // ── Horizontal bar chart ──
@@ -63,24 +81,45 @@ function HBar({ label, pct, count, color, note }: {
   )
 }
 
-// ── Volume bar ──
-function VolumeBar({ label, vol, deals, color, pct }: {
-  label: string; vol: number; deals: number; color: string; pct: number
-}) {
+// ── Pie chart ──
+function PieChart() {
+  const cx = 90, cy = 90, r = 72, ir = 44
+  let angle = -Math.PI / 2
+  const slices = PRODUCTS_VOL.map(p => {
+    const start = angle
+    const sweep = (p.pct / 100) * 2 * Math.PI
+    angle += sweep
+    return { ...p, start, sweep }
+  })
+  const arc = (cx: number, cy: number, r: number, start: number, sweep: number) => {
+    const x1 = cx + r * Math.cos(start)
+    const y1 = cy + r * Math.sin(start)
+    const x2 = cx + r * Math.cos(start + sweep)
+    const y2 = cy + r * Math.sin(start + sweep)
+    const large = sweep > Math.PI ? 1 : 0
+    return `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`
+  }
   return (
-    <div className="py-2">
-      <div className="flex justify-between items-baseline mb-1">
-        <span className="text-sm font-medium text-white">{label}</span>
-        <span className="text-xs font-mono text-zinc-500">{deals} deals</span>
-      </div>
-      <div className="h-5 bg-zinc-800/60 rounded-sm overflow-hidden relative">
-        <div
-          className="h-full rounded-sm"
-          style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.8 }}
-        />
-        <span className="absolute inset-0 flex items-center px-2 text-xs font-mono text-white/90">
-          ${vol}M
-        </span>
+    <div className="flex items-center gap-6">
+      <svg viewBox="0 0 180 180" className="w-40 h-40 shrink-0">
+        {slices.map(s => (
+          <path key={s.label} d={arc(cx, cy, r, s.start, s.sweep)}
+            fill={s.color} opacity={0.85} stroke="#18181b" strokeWidth={1.5} />
+        ))}
+        {/* donut hole */}
+        <circle cx={cx} cy={cy} r={ir} fill="#18181b" />
+        <text x={cx} y={cy - 5} textAnchor="middle" fontSize={11} fill="#fbbf24" fontFamily="monospace" fontWeight="bold">$145M</text>
+        <text x={cx} y={cy + 9} textAnchor="middle" fontSize={8} fill="#6b7280" fontFamily="monospace">total</text>
+      </svg>
+      <div className="space-y-2 flex-1">
+        {PRODUCTS_VOL.map(p => (
+          <div key={p.label} className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+            <span className="text-xs text-zinc-300 flex-1">{p.label}</span>
+            <span className="text-xs font-mono text-zinc-500">${p.vol}M</span>
+            <span className="text-xs font-mono w-8 text-right" style={{ color: p.color }}>{p.pct}%</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -182,12 +221,23 @@ function PercentileBar() {
 // ── Main page ──
 export function WhyUsPage() {
   return (
+    <>
+    <Helmet>
+      <title>Why RCR International — $140M+ in Verified Commercial Finance Closings</title>
+      <meta name="description" content="RCR International has closed 50+ commercial finance deals totaling over $140M — trade finance, A/R, equipment, and CRE. The same AI lender-matching platform is now available to your clients." />
+      <meta property="og:title" content="Why RCR International — $140M+ in Verified Commercial Finance Closings" />
+      <meta property="og:description" content="RCR International has closed 50+ commercial finance deals totaling over $140M — trade finance, A/R, equipment, and CRE. The same AI lender-matching platform is now available to your clients." />
+      <meta property="og:url" content="https://finance.rrecktek.com/why-us" />
+      <meta property="og:type" content="website" />
+      <link rel="canonical" href="https://finance.rrecktek.com/why-us" />
+      <script type="application/ld+json">{JSON.stringify(JSON_LD)}</script>
+    </Helmet>
     <div className="p-6 max-w-6xl mx-auto pb-16">
 
       {/* ── Page header ── */}
       <div className="mb-8 flex items-baseline gap-3 flex-wrap">
         <h1 className="text-xl font-semibold text-white">Why Us?</h1>
-        <span className="text-sm text-zinc-500">
+        <span className="text-sm text-white">
           Verified performance data · 20+ years · &gt;$140M placed · 50+ closed transactions
         </span>
       </div>
@@ -227,13 +277,9 @@ export function WhyUsPage() {
         <div className="bg-zinc-900 border border-zinc-800 rounded p-5">
           <div className="flex items-baseline justify-between mb-4">
             <h2 className="text-sm font-semibold text-white">Volume by Product</h2>
-            <span className="text-xs font-mono text-zinc-600">$145M total</span>
+            <span className="text-xs font-mono text-zinc-600">by dollar volume</span>
           </div>
-          <div className="space-y-1">
-            {PRODUCTS_VOL.map(p => (
-              <VolumeBar key={p.label} {...p} />
-            ))}
-          </div>
+          <PieChart />
           <div className="mt-4 pt-4 border-t border-zinc-800">
             <p className="text-xs text-zinc-600 font-mono">trade finance leads volume · AR leads deal count</p>
           </div>
@@ -284,7 +330,7 @@ export function WhyUsPage() {
             {
               color: "text-blue-400",
               title: "Precision Matching",
-              body: "The same AI lender-matching platform managing our deal pipeline is now working for you — identifying optimal capital sources across structure, size, and industry.",
+              body: "Our AI was trained on the same 50+ deals in this dataset. It knows which lenders fund which structures — then aligns your deal to the capital source most likely to close.",
             },
             {
               color: "text-teal-400",
@@ -304,7 +350,7 @@ export function WhyUsPage() {
       <div className="border border-zinc-800 rounded p-8 text-center bg-zinc-900/50">
         <p className="text-xs font-mono text-zinc-600 mb-2 tracking-widest uppercase">Ready to close?</p>
         <h2 className="text-lg font-semibold text-white mb-1">
-          The same platform closing our deals is working for you now.
+          Careful alignment and immediate processing.
         </h2>
         <p className="text-sm text-zinc-500 mb-6">
           No long-term contracts. No hidden fees. Startups accepted.
@@ -327,5 +373,6 @@ export function WhyUsPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
