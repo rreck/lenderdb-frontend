@@ -71,7 +71,7 @@ export function MarketIntelligencePage() {
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-white">Market Intelligence</h1>
         <p className="text-sm text-zinc-500 mt-0.5">
-          Lender appetite trends across the equipment finance market · Updated {formatDate(summary.lastUpdated)}
+          Lender appetite trends across the equipment finance market · <span className="text-white">appetite intelligence updated daily</span>
         </p>
       </div>
 
