@@ -157,6 +157,8 @@ export function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [product, setProduct] = useState<string>("all")
+  const [pin, setPin] = useState("")
+  const unlocked = pin === "000"
 
   const handleDelete = useCallback((id: string) => {
     setLeads(prev => prev.filter(l => l.id !== id))
@@ -191,14 +193,24 @@ export function LeadsPage() {
             {loading ? "Loading…" : `${leads.length} submission${leads.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-2">
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="password"
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            maxLength={8}
+            placeholder="·····"
+            className="w-20 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white text-center outline-none focus:border-zinc-600 placeholder-zinc-700"
+          />
+          <Button variant="outline" size="sm" onClick={load} disabled={loading || !unlocked} className="gap-2">
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Product filter tabs */}
-      <div className="flex gap-2 mb-5">
+      <div className={cn("flex gap-2 mb-5 transition-opacity", !unlocked && "opacity-30 pointer-events-none select-none blur-sm")}>
         {["all", "equipment", "cre", "ar", "trade"].map(p => {
           const isActive = product === p
           const count = p === "all" ? leads.length : (counts[p] ?? 0)
@@ -228,6 +240,7 @@ export function LeadsPage() {
       </div>
 
       {/* Table */}
+      <div className={cn("transition-opacity", !unlocked && "opacity-30 pointer-events-none select-none blur-sm")}>
       {loading ? (
         <div className="flex items-center justify-center h-48">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -257,6 +270,7 @@ export function LeadsPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   )
 }
