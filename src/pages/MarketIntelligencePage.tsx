@@ -102,7 +102,7 @@ export function MarketIntelligencePage() {
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold text-white">Industry Appetite Heat Map</h2>
+            <h2 className="text-sm font-semibold text-white">Product Appetite Heat Map</h2>
           </div>
           <div className="space-y-3">
             {summary.hotIndustries.map(item => (
