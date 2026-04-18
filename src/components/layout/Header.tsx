@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, Bot, ClipboardList, Users } from "lucide-react"
+import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, Bot, ClipboardList, Users, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { name: "Crawler", path: "/crawler", icon: Bot },
   { name: "Apply", path: "/apply", icon: ClipboardList },
   { name: "Leads", path: "/leads", icon: Users },
+  { name: "Why Us?", path: "/why-us", icon: Award },
 ]
 
 export function Header() {
@@ -22,10 +23,10 @@ export function Header() {
       <div className="flex h-14 items-center px-6">
         {/* Logo */}
         <div className="flex items-center gap-3 mr-8">
-          <div className="flex items-center gap-2">
+            <Link to="/why-us" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <Database className="h-4 w-4 text-primary" />
             <span className="text-sm font-bold tracking-tight">LenderDB</span>
-          </div>
+          </Link>
           <span className="text-[11px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
             Equipment Finance Intelligence
           </span>

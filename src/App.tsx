@@ -9,6 +9,7 @@ import {
   CrawlerPage,
   ApplyPage,
   LeadsPage,
+  WhyUsPage,
 } from "@/pages"
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/lenders" replace />} />
+          <Route index element={<Navigate to="/why-us" replace />} />
           <Route path="lenders" element={<LendersPage />} />
           <Route path="lenders/:lenderId" element={<LenderDetailsPage />} />
           <Route path="match" element={<DealMatcherPage />} />
@@ -25,6 +26,7 @@ function App() {
           <Route path="crawler" element={<CrawlerPage />} />
           <Route path="apply" element={<ApplyPage />} />
           <Route path="leads" element={<LeadsPage />} />
+          <Route path="why-us" element={<WhyUsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
