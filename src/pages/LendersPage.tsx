@@ -236,60 +236,8 @@ export function LendersPage() {
 
   return (
     <div className="p-6">
-      {/* Page header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Lender Database</h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Showing <span className="text-white font-medium">{lenders.length.toLocaleString()}</span>
-            {dbTotal !== null && <> of <span className="text-white font-medium">{dbTotal.toLocaleString()}</span></>}
-            {" active lenders. "}
-            {fresh
-              ? <>
-                  <span className="text-white font-medium">{fresh.changed_24h.toLocaleString()}</span>
-                  {" records changed today, the newest "}{freshAgo(fresh.newest_check)}{"."}
-                </>
-              : null}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            disabled={crawlerStatus?.status === "running"}
-            onClick={async () => {
-              try {
-                await apiService.triggerEnrichment()
-                const s = await apiService.getCrawlerStatus()
-                setCrawlerStatus(s)
-              } catch (e) {
-                console.error("Enrich failed", e)
-              }
-            }}
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${crawlerStatus?.status === "running" ? "animate-spin" : ""}`} />
-            {crawlerStatus?.status === "running" ? "Enriching…" : "Enrich Records"}
-          </Button>
-          {crawlerStatus?.status === "running" && crawlerStatus.batch_progress && (
-            <div className="text-right">
-              <div className="text-[11px] text-zinc-500 mb-1">
-                {crawlerStatus.batch_progress.done.toLocaleString()} / {crawlerStatus.batch_progress.total.toLocaleString()} enriched
-                {crawlerStatus.batch_progress.errors > 0 && (
-                  <span className="text-amber-500 ml-1">· {crawlerStatus.batch_progress.errors} errors</span>
-                )}
-              </div>
-              <div className="w-48 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${Math.round((crawlerStatus.batch_progress.done / crawlerStatus.batch_progress.total) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
+      {/* Nothing stands between the masthead and the first lender. The counts
+          and the enrich control live in the bar that stays put. */}
       {/* Sort and filter bars stay under the masthead while the tiles scroll */}
       <div className="sticky top-14 z-40 -mx-6 px-6 pt-3 bg-black border-b border-zinc-800">
 
@@ -526,18 +474,48 @@ export function LendersPage() {
 
       {/* Last-checked banner + top pagination */}
       <div className="flex items-center justify-between mb-3 min-h-[28px]">
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-          <Clock className="h-3 w-3" />
-          {fresh
-            ? <>
-                Each tile carries its own check date.
-                {" "}<span className="text-zinc-400">{fresh.changed_24h.toLocaleString()}</span>
-                {" of these records changed in the last 24 hours, "}
-                <span className="text-zinc-400">{fresh.changed_7d.toLocaleString()}</span>
-                {" in the last week"}
-              </>
-            : "Each tile carries its own check date"
-          }
+        <div className="flex items-center gap-3 text-[11px] text-zinc-500 flex-wrap">
+          <span className="flex items-center gap-1.5">
+            <Clock className="h-3 w-3" />
+            <span className="text-zinc-300">{lenders.length.toLocaleString()}</span>
+            {dbTotal !== null && <>of <span className="text-zinc-300">{dbTotal.toLocaleString()}</span></>}
+            shown
+          </span>
+          {fresh && (
+            <span>
+              <span className="text-zinc-300">{fresh.changed_24h.toLocaleString()}</span>
+              {" changed today, newest "}{freshAgo(fresh.newest_check)}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 h-6 text-[11px] px-2"
+            disabled={crawlerStatus?.status === "running"}
+            onClick={async () => {
+              try {
+                await apiService.triggerEnrichment()
+                const st = await apiService.getCrawlerStatus()
+                setCrawlerStatus(st)
+              } catch (e) {
+                console.error("Enrich failed", e)
+              }
+            }}
+          >
+            <RefreshCw className={`h-3 w-3 ${crawlerStatus?.status === "running" ? "animate-spin" : ""}`} />
+            {crawlerStatus?.status === "running" ? "Enriching" : "Enrich"}
+          </Button>
+          {crawlerStatus?.status === "running" && crawlerStatus.batch_progress && (
+            <span className="flex items-center gap-2">
+              <span className="w-24 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                <span
+                  className="block h-full bg-primary rounded-full"
+                  style={{ width: `${Math.round((crawlerStatus.batch_progress.done / Math.max(1, crawlerStatus.batch_progress.total)) * 100)}%` }}
+                />
+              </span>
+              {crawlerStatus.batch_progress.done.toLocaleString()} of {crawlerStatus.batch_progress.total.toLocaleString()}
+            </span>
+          )}
         </div>
         {hasMore && (
           <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="gap-1.5 text-xs h-7">

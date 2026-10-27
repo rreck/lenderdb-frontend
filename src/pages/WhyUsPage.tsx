@@ -303,7 +303,7 @@ export function WhyUsPage() {
       {/* ── Page header ── */}
       <div className="mb-8">
         <span className="text-sm text-white">
-          Verified performance data · 20+ years · &gt;$140M placed · 50+ closed transactions
+          20+ years · &gt;$140M placed · 50+ closed transactions
         </span>
       </div>
 
