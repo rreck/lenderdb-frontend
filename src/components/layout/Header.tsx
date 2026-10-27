@@ -22,12 +22,13 @@ export function Header() {
       <div className="flex h-14 items-center px-6">
         {/* Masthead, worded as the printed material is */}
         <div className="flex items-center gap-3 mr-8">
-          <Link to="/why-us" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <Link to="/lenders" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <img src="/rrecktek-inv.png" alt="RRECKTEK" className="h-6" />
             <span className="text-lg font-bold tracking-wide text-white leading-none">FINANCE</span>
           </Link>
-          <span className="hidden lg:block text-[10px] uppercase tracking-widest text-gray-500 leading-tight border-l border-zinc-700 pl-3">
-            A division of RCR<br />International Finance
+          <span className="hidden lg:block text-[10px] uppercase tracking-wide text-gray-500 leading-tight border-l border-zinc-700 pl-3">
+            <span className="block whitespace-nowrap">A division of</span>
+            <span className="block whitespace-nowrap">RCR International Finance</span>
           </span>
         </div>
 

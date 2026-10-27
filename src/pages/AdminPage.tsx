@@ -955,6 +955,100 @@ interface Coverage {
   updated_24h: number
 }
 
+interface PassState {
+  running: boolean
+  crawled: number
+  failed: number
+  due: number
+  with_site: number
+  last_lender: string | null
+  last_at?: string
+  started: string | null
+  thread_alive: boolean
+}
+
+function FullPass() {
+  const [p, setP] = useState<PassState | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const read = () => fetch("/api/crawler/pass").then(r => r.json())
+    .then(b => { if (b.success) setP(b.data) })
+    .catch(() => { /* the panel stays quiet */ })
+
+  useEffect(() => {
+    read()
+    const id = setInterval(read, 15000)
+    return () => clearInterval(id)
+  }, [])
+
+  const send = async (action: string) => {
+    setBusy(true)
+    try {
+      await fetch("/api/crawler/pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      })
+    } catch { /* the state line will say */ }
+    setBusy(false)
+    read()
+  }
+
+  if (!p) return null
+  const done = p.with_site - p.due
+  const pct = p.with_site ? Math.round((done / p.with_site) * 100) : 0
+
+  return (
+    <div className={CARD}>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-white">Full pass</h2>
+            <Badge variant={p.running ? "success" : "secondary"}>
+              {p.running ? (p.thread_alive ? "running" : "marked running, worker gone") : "stopped"}
+            </Badge>
+          </div>
+          <p className="text-sm text-zinc-400 mt-1">
+            Works through every lender that has a website, oldest check first, drawn at
+            random from the oldest end so one stubborn site cannot block the rest. It
+            keeps its own state, so restarting the crawler picks up where it left off
+            rather than starting again.
+          </p>
+        </div>
+        <Button size="sm" onClick={() => send(p.running ? "stop" : "start")} disabled={busy}
+                variant={p.running ? "outline" : "default"}>
+          {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          {p.running ? "Stop" : "Start"}
+        </Button>
+      </div>
+
+      <div className="mt-4 h-2 rounded-full bg-zinc-800 overflow-hidden">
+        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-px bg-zinc-800 rounded-lg overflow-hidden">
+        {[
+          { k: "Checked in the last day", v: done.toLocaleString() },
+          { k: "Still due", v: p.due.toLocaleString() },
+          { k: "With a website", v: p.with_site.toLocaleString() },
+          { k: "Crawled this pass", v: p.crawled.toLocaleString() },
+          { k: "Failed this pass", v: p.failed.toLocaleString() },
+        ].map(c => (
+          <div key={c.k} className="bg-zinc-950 p-4">
+            <div className="text-xl font-semibold text-white">{c.v}</div>
+            <div className="text-xs text-zinc-500 mt-1">{c.k}</div>
+          </div>
+        ))}
+      </div>
+      {p.last_lender && (
+        <p className="mt-3 text-xs text-zinc-500">
+          Newest: {p.last_lender}
+          {p.last_at && <> · {fmt(p.last_at)}</>}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function CrawlerTab() {
   const [cov, setCov] = useState<Coverage | null>(null)
 
@@ -976,6 +1070,8 @@ function CrawlerTab() {
 
   return (
     <div className="space-y-5">
+      <FullPass />
+
       <div className={CARD}>
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-primary" />

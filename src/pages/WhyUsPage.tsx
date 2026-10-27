@@ -429,14 +429,6 @@ export function WhyUsPage() {
           >
             Apply Now →
           </Link>
-          <a
-            href="/rcr-panel-5-closings.png"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white px-6 py-3 text-sm font-mono tracking-wider rounded transition-colors"
-          >
-            View All Closings ↗
-          </a>
         </div>
       </div>
     </div>
