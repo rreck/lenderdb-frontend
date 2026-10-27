@@ -1,5 +1,6 @@
-import { useState } from "react"
-import { FileText, Building2, Receipt, Globe, CheckCircle2, Loader2, Upload } from "lucide-react"
+import { Children, cloneElement, isValidElement, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
+import { FileText, Building2, Receipt, Globe, CheckCircle2, Loader2, Upload, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,11 +13,34 @@ const LBL = "text-zinc-400 text-sm"
 const INP = "bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
 const INP_ERR = "bg-zinc-800 border-red-500 text-white placeholder:text-zinc-600"
 
+const controlId = (label: string) =>
+  "f-" + label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")
+
+/**
+ * Attach the id to the first form control in the tree, so the label can bind to
+ * it with htmlFor. The control is not always the direct child: Deal Amount, for
+ * one, wraps its Input in a div carrying the currency prefix.
+ */
+function bindControl(node: React.ReactNode, id: string, state: { bound: boolean }): React.ReactNode {
+  if (state.bound || !isValidElement(node)) return node
+  const el = node as React.ReactElement<{ children?: React.ReactNode }>
+  if (el.type === Input || el.type === "textarea" || el.type === SelectTrigger) {
+    state.bound = true
+    return cloneElement(el as React.ReactElement<{ id?: string }>, { id })
+  }
+  const kids = el.props.children
+  if (kids === undefined) return el
+  return cloneElement(el, {}, Children.map(kids, k => bindControl(k, id, state)))
+}
+
 function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+  const id = controlId(label)
+  const state = { bound: false }
+  const bound = Children.map(children, c => bindControl(c, id, state))
   return (
     <div className={FIELD}>
-      <Label className={LBL}>{label}</Label>
-      {children}
+      <Label className={LBL} htmlFor={id}>{label}</Label>
+      {bound}
       {error && <p className="text-xs text-red-400 mt-0.5">{error}</p>}
     </div>
   )
@@ -290,7 +314,7 @@ function CREForm({ onSubmit, loading }: { onSubmit: (d: Record<string, string>) 
 function ARForm({ onSubmit, loading }: { onSubmit: (d: Record<string, string>) => void; loading: boolean }) {
   const [f, setF] = useState({
     name: "", address: "", website: "", phone: "", email: "",
-    productType: "", monthlyInvoiceVolume: "", sector: "", description: "",
+    productType: "", dealAmount: "", monthlyInvoiceVolume: "", sector: "", description: "",
   })
   const [attempted, setAttempted] = useState(false)
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF(p => ({ ...p, [k]: e.target.value }))
@@ -325,6 +349,12 @@ function ARForm({ onSubmit, loading }: { onSubmit: (d: Record<string, string>) =
               <SelectItem value="inventory" className="text-white">Inventory Financing</SelectItem>
             </SelectContent>
           </Select>
+        </Field>
+        <Field label="Requested Facility Amount *" error={e("dealAmount")}>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+            <Input className={cn(e("dealAmount") ? INP_ERR : INP, "pl-6")} placeholder="1,300,000" value={f.dealAmount} onChange={set("dealAmount")} />
+          </div>
         </Field>
         <Field label="Monthly Invoice / Revenue Volume">
           <div className="relative">
@@ -367,7 +397,7 @@ function ARForm({ onSubmit, loading }: { onSubmit: (d: Record<string, string>) =
 
       <Button className="w-full" disabled={loading} onClick={() => {
         setAttempted(true)
-        if (!f.name || !f.email || !f.productType) return
+        if (!f.name || !f.email || !f.productType || !f.dealAmount) return
         onSubmit(f)
       }}>
         {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Submitting...</> : "Submit Application"}
@@ -479,20 +509,50 @@ const PRODUCTS = [
 ]
 
 export function ApplyPage() {
+  const { product: routeProduct } = useParams<{ product?: string }>()
+  const navigate = useNavigate()
+  // Each form has its own URL: /apply/equipment, /apply/cre, /apply/ar, /apply/trade.
+  // /apply with no product, or an unknown product, falls back to the first form.
+  const active = PRODUCTS.some(p => p.key === routeProduct) ? routeProduct! : PRODUCTS[0].key
   const [submitted, setSubmitted] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState<Record<string, boolean>>({})
+  const [failed, setFailed] = useState<Record<string, string | null>>({})
 
   const handleSubmit = (product: string) => async (data: Record<string, string>) => {
     setLoading(p => ({ ...p, [product]: true }))
+    setFailed(p => ({ ...p, [product]: null }))
+
+    // The application is only reported as submitted once the server has
+    // recorded it. A transport error, a non 2xx reply, or a body reporting
+    // failure all leave the applicant on the form with the reason shown,
+    // rather than on a success screen with the lead lost.
+    let reason: string | null = null
     try {
-      await fetch("/api/leads", {
+      const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product, ...data, source: "apply_page", preferred_partner: "rcr" }),
       })
-    } catch (_) { /* fail silently — lead capture best-effort */ }
-    await new Promise(r => setTimeout(r, 800))
+      if (!res.ok) {
+        reason = `The server rejected the application with status ${res.status}. Nothing was saved.`
+      } else {
+        const body = await res.json().catch(() => null)
+        if (body && body.success === false) {
+          reason = typeof body.error === "string"
+            ? body.error
+            : "The server could not record the application. Nothing was saved."
+        }
+      }
+    } catch {
+      reason = "The application could not be sent. Check the connection and submit again."
+    }
+
+    await new Promise(r => setTimeout(r, 400))
     setLoading(p => ({ ...p, [product]: false }))
+    if (reason) {
+      setFailed(p => ({ ...p, [product]: reason }))
+      return
+    }
     setSubmitted(p => ({ ...p, [product]: true }))
   }
 
@@ -513,7 +573,7 @@ export function ApplyPage() {
       </div>
 
       <div className="p-6 max-w-3xl mx-auto">
-        <Tabs defaultValue="equipment">
+        <Tabs value={active} onValueChange={k => navigate(`/apply/${k}`)}>
           <TabsList className="grid grid-cols-4 w-full bg-zinc-900 border border-zinc-800 h-auto p-1 mb-6">
             {PRODUCTS.map(({ key, label, icon: Icon }) => (
               <TabsTrigger
@@ -532,6 +592,15 @@ export function ApplyPage() {
               <div className="mb-4">
                 <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium">{subtitle}</p>
               </div>
+              {failed[key] && (
+                <div
+                  role="alert"
+                  className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3"
+                >
+                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-300">{failed[key]}</p>
+                </div>
+              )}
               {submitted[key] ? (
                 <SuccessBanner product={PRODUCTS.find(p => p.key === key)!.label} />
               ) : key === "equipment" ? (

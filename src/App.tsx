@@ -25,6 +25,7 @@ function App() {
           <Route path="watchlist" element={<WatchlistPage />} />
           <Route path="crawler" element={<CrawlerPage />} />
           <Route path="apply" element={<ApplyPage />} />
+          <Route path="apply/:product" element={<ApplyPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="why-us" element={<WhyUsPage />} />
         </Route>
