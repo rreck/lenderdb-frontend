@@ -45,6 +45,157 @@ function SignalFeed({ signals }: { signals: AppetiteSignal[] }) {
   )
 }
 
+interface AppetiteMover {
+  name: string
+  type: string | null
+  appetite: number | null
+  positive?: number
+  negative?: number
+  caution?: number
+  newest: string | null
+}
+
+interface AppetiteRead {
+  bands: Record<string, number>
+  evidenced_lenders: number
+  signals: Record<string, number>
+  expanding: AppetiteMover[]
+  cooling: AppetiteMover[]
+  recent: { name: string; type: string; text: string; source: string; at: string }[]
+  by_institution_type: { type: string | null; lenders: number; avg_appetite: number | null; evidenced: number }[]
+  as_of: string
+}
+
+const BAND_ORDER = ["expanding", "open", "selective", "pulling back", "no reading"]
+const BAND_STYLE: Record<string, string> = {
+  "expanding": "bg-green-500",
+  "open": "bg-emerald-600",
+  "selective": "bg-yellow-500",
+  "pulling back": "bg-red-500",
+  "no reading": "bg-zinc-700",
+}
+
+function AppetiteSection() {
+  const [a, setA] = useState<AppetiteRead | null>(null)
+
+  useEffect(() => {
+    fetch("/api/market/appetite").then(r => r.json())
+      .then(b => { if (b.success) setA(b.data) })
+      .catch(() => { /* the section simply does not appear */ })
+  }, [])
+
+  if (!a) return null
+
+  const total = BAND_ORDER.reduce((s, k) => s + (a.bands[k] || 0), 0) || 1
+  const read = total - (a.bands["no reading"] || 0)
+
+  return (
+    <div className="mb-6 space-y-4">
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <h2 className="text-sm font-semibold text-white">Where appetite sits right now</h2>
+          <span className="text-xs text-zinc-500">
+            {read.toLocaleString()} of {total.toLocaleString()} active lenders carry a reading ·
+            {" "}{a.evidenced_lenders.toLocaleString()} have live evidence
+          </span>
+        </div>
+
+        <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-zinc-800">
+          {BAND_ORDER.map(k => (
+            <div key={k} className={BAND_STYLE[k]} style={{ width: `${((a.bands[k] || 0) / total) * 100}%` }} />
+          ))}
+        </div>
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3">
+          {BAND_ORDER.map(k => (
+            <div key={k}>
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${BAND_STYLE[k]}`} />
+                <span className="text-lg font-semibold text-white">{(a.bands[k] || 0).toLocaleString()}</span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-0.5 capitalize">{k}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-zinc-500">
+          A reading comes from dated signals found on the lender's own publications.
+          No reading means the score is a placeholder and should not be relied on.
+          Positive {a.signals.positive || 0} · caution {a.signals.caution || 0} · negative {a.signals.negative || 0}.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+          <h2 className="text-sm font-semibold text-white">Expanding</h2>
+          <div className="mt-3 divide-y divide-zinc-800">
+            {a.expanding.map(m => (
+              <div key={m.name} className="flex items-center gap-3 py-2">
+                <span className="text-sm text-white flex-1 truncate">{m.name}</span>
+                <span className="text-xs text-zinc-500">{m.type}</span>
+                <span className="text-xs text-green-400">+{m.positive}</span>
+                <span className="text-sm font-semibold text-white w-8 text-right">{m.appetite}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+          <h2 className="text-sm font-semibold text-white">Pulling back</h2>
+          <div className="mt-3 divide-y divide-zinc-800">
+            {a.cooling.map(m => (
+              <div key={m.name} className="flex items-center gap-3 py-2">
+                <span className="text-sm text-white flex-1 truncate">{m.name}</span>
+                <span className="text-xs text-zinc-500">{m.type}</span>
+                <span className="text-xs text-red-400">-{m.negative}</span>
+                <span className="text-sm font-semibold text-white w-8 text-right">{m.appetite}</span>
+              </div>
+            ))}
+            {a.cooling.length === 0 && <p className="py-2 text-sm text-zinc-500">Nothing is pulling back</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+        <h2 className="text-sm font-semibold text-white">Appetite by lender type</h2>
+        <table className="w-full text-sm mt-3">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 border-b border-zinc-800">
+              <th className="py-2 font-medium">Type</th>
+              <th className="py-2 font-medium text-right">Lenders</th>
+              <th className="py-2 font-medium text-right">Average</th>
+              <th className="py-2 font-medium text-right">With a reading</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-800">
+            {a.by_institution_type.map(r => (
+              <tr key={String(r.type)} className="text-zinc-300">
+                <td className="py-2">{r.type}</td>
+                <td className="py-2 text-right">{r.lenders.toLocaleString()}</td>
+                <td className="py-2 text-right text-white font-medium">{r.avg_appetite ?? "none"}</td>
+                <td className="py-2 text-right">{r.evidenced.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5">
+        <h2 className="text-sm font-semibold text-white">Newest signals</h2>
+        <div className="mt-3 divide-y divide-zinc-800">
+          {a.recent.map((s, i) => (
+            <div key={i} className="py-2.5">
+              <div className="flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${s.type === "positive" ? "bg-green-500" : s.type === "negative" ? "bg-red-500" : "bg-yellow-500"}`} />
+                <span className="text-sm text-white">{s.name}</span>
+                <span className="text-xs text-zinc-500 ml-auto">{new Date(s.at).toLocaleDateString()}</span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">{s.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MarketIntelligencePage() {
   const [summary, setSummary] = useState<MarketSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -74,6 +225,8 @@ export function MarketIntelligencePage() {
           Lender appetite trends across the equipment finance market · <span className="text-white">appetite intelligence updated daily</span>
         </p>
       </div>
+
+      <AppetiteSection />
 
       {/* KPI row */}
       <div className="grid grid-cols-3 gap-4 mb-6">

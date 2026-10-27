@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, ClipboardList, Award } from "lucide-react"
+import { Database, Zap, BarChart3, Bell, MessageSquare, X, ClipboardList, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // The crawler, the leads and the submissions views now live behind /admin, which
@@ -10,7 +10,6 @@ const navItems = [
   { name: "Lender Database", path: "/lenders", icon: Database },
   { name: "Deal Matcher", path: "/match", icon: Zap },
   { name: "Market Intel", path: "/market", icon: BarChart3 },
-  { name: "Watchlist", path: "/watchlist", icon: Star },
   { name: "Apply", path: "/apply", icon: ClipboardList },
   { name: "Why Us?", path: "/why-us", icon: Award },
 ]

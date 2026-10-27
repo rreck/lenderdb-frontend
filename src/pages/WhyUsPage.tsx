@@ -1,8 +1,74 @@
 
 
+import { useState, useEffect } from "react"
 import { Helmet } from "react-helmet-async"
 import { cn } from "@/lib/utils"
 import { Link } from "react-router-dom"
+
+/* How current the lender record set is, read live rather than claimed. */
+interface Freshness {
+  lenders: number
+  active: number
+  checked: number
+  newest_check: string | null
+  changed_24h: number
+  changed_7d: number
+  live_signals: number
+  lenders_with_signals: number
+  newest_signal: string | null
+}
+
+function ago(iso: string | null) {
+  if (!iso) return "never"
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 60) return mins + (mins === 1 ? " minute ago" : " minutes ago")
+  const hrs = Math.round(mins / 60)
+  if (hrs < 48) return hrs + (hrs === 1 ? " hour ago" : " hours ago")
+  return Math.round(hrs / 24) + " days ago"
+}
+
+function FreshnessBar() {
+  const [f, setF] = useState<Freshness | null>(null)
+
+  useEffect(() => {
+    const read = () => fetch("/api/freshness").then(r => r.json())
+      .then(b => { if (b.success) setF(b.data) })
+      .catch(() => { /* the bar simply does not appear */ })
+    read()
+    const id = setInterval(read, 60000)
+    return () => clearInterval(id)
+  }, [])
+
+  if (!f) return null
+
+  const cells = [
+    { v: f.active.toLocaleString(), k: "Active lenders" },
+    { v: f.checked.toLocaleString(), k: "Checked at least once" },
+    { v: f.changed_24h.toLocaleString(), k: "Records changed today" },
+    { v: f.changed_7d.toLocaleString(), k: "Changed this week" },
+    { v: f.lenders_with_signals.toLocaleString(), k: "Carrying live appetite evidence" },
+  ]
+
+  return (
+    <div className="mb-6 rounded border border-zinc-800">
+      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-2.5">
+        <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+        <span className="text-sm text-white font-medium">The record set is live</span>
+        <span className="text-xs text-zinc-400 ml-auto">
+          newest lender check {ago(f.newest_check)} · newest appetite signal {ago(f.newest_signal)}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-zinc-800">
+        {cells.map(c => (
+          <div key={c.k} className="px-4 py-3">
+            <span className="block text-xl font-bold text-white leading-none">{c.v}</span>
+            <span className="block text-[11px] text-zinc-400 uppercase tracking-wider mt-1.5">{c.k}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const JSON_LD = {
   "@context": "https://schema.org",
@@ -241,6 +307,8 @@ export function WhyUsPage() {
           Verified performance data · 20+ years · &gt;$140M placed · 50+ closed transactions
         </span>
       </div>
+
+      <FreshnessBar />
 
       {/* ── Hero stats ── */}
       <div className="grid grid-cols-3 md:grid-cols-6 border border-zinc-800 rounded mb-6 divide-x divide-zinc-800">

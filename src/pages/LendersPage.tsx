@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Filter, SlidersHorizontal, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Clock, BadgeCheck } from "lucide-react"
+import { Search, Filter, SlidersHorizontal, Loader2, X, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Clock, BadgeCheck, Zap } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { canFastTrack } from "@/components/lenders/LenderCard"
 import { LenderCard } from "@/components/lenders"
 import { apiService } from "@/api"
 import type { Lender, LenderFilters, CrawlerStatus, RiskTolerance, ApprovalSpeed } from "@/api/types"
@@ -60,9 +61,9 @@ export function LendersPage() {
   const [hasMore, setHasMore] = useState(false)
   const [offset, setOffset] = useState(0)
   const [dbTotal, setDbTotal] = useState<number | null>(null)
-  const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<LenderFilters>({})
+  const [fastOnly, setFastOnly] = useState(false)
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const lastPollTime = useRef<string>(new Date().toISOString())
@@ -136,25 +137,6 @@ export function LendersPage() {
     fetchLenders()
   }, [fetchLenders])
 
-  useEffect(() => {
-    apiService.getWatchlist().then(wl => {
-      setWatchedIds(new Set(wl.map(e => e.lenderId)))
-    })
-  }, [])
-
-  const handleWatchToggle = async (e: React.MouseEvent, lenderId: string) => {
-    e.stopPropagation()
-    if (watchedIds.has(lenderId)) {
-      const wl = await apiService.getWatchlist()
-      const entry = wl.find(e => e.lenderId === lenderId)
-      if (entry) await apiService.removeFromWatchlist(entry.id)
-      setWatchedIds(prev => { const s = new Set(prev); s.delete(lenderId); return s })
-    } else {
-      await apiService.addToWatchlist(lenderId)
-      setWatchedIds(prev => new Set([...prev, lenderId]))
-    }
-  }
-
   const toggleDealSize = (preset: typeof DEAL_SIZE_PRESETS[0]) => {
     setFilters(prev => ({
       ...prev,
@@ -197,6 +179,7 @@ export function LendersPage() {
 
   const sortedLenders = useMemo(() => {
     let filtered = lenders
+    if (fastOnly) filtered = filtered.filter(canFastTrack)
     if (filters.countries?.length) {
       filtered = filtered.filter(l =>
         filters.countries!.some(c => (l.countriesServed ?? []).includes(c))
@@ -214,7 +197,7 @@ export function LendersPage() {
       const cmp = av < bv ? -1 : av > bv ? 1 : 0
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [lenders, sortField, sortDir])
+  }, [lenders, sortField, sortDir, fastOnly])
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -358,6 +341,15 @@ export function LendersPage() {
           onClick={() => setFilters(prev => ({ ...prev, rcrOnly: !prev.rcrOnly }))}
         >
           RCR Lender
+        </Button>
+        <Button
+          variant={fastOnly ? "default" : "outline"}
+          className="gap-2"
+          onClick={() => setFastOnly(f => !f)}
+          title="Only lenders a packet can go straight out to"
+        >
+          <Zap className="h-4 w-4" />
+          Fast Track
         </Button>
 
       </div>
@@ -544,9 +536,7 @@ export function LendersPage() {
               <LenderCard
                 key={lender.id}
                 lender={lender}
-                isWatched={watchedIds.has(lender.id)}
                 onClick={() => navigate(`/lenders/${lender.id}`)}
-                onWatchToggle={(e) => handleWatchToggle(e, lender.id)}
                 onCrawl={async (e) => {
                   e.stopPropagation()
                   await apiService.crawlLender(lender.id)

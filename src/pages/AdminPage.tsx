@@ -3,6 +3,7 @@ import {
   Bell, Inbox, Bot, FlaskConical, BookOpen, RefreshCw, Loader2,
   Plus, Check, X, AlertTriangle, CheckCircle2, Gauge,
   ChevronDown, ChevronRight, Mail, Send, Search, Download,
+  Trash2, Package, FileText,
 } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -124,7 +125,7 @@ function NotifyTab() {
           <span className="text-zinc-500">
             {on === 0
               ? "No alert leaves the system while every number is off. Applications are still stored."
-              : "AWS Notify allows 10 messages per number per day and 200 across the account per day."}
+              : "Each armed number gets its own message, recorded on its own."}
           </span>
         </div>
 
@@ -226,8 +227,231 @@ function alertState(r: Submission) {
   return r.sms_sent === true ? "sent" : r.sms_sent === false ? "failed" : "none"
 }
 
-function SubmissionRow({ r, onChanged }: { r: Submission; onChanged: () => void }) {
+/* ── packet ──────────────────────────────────────────────────────────────── */
+
+interface ShortLender {
+  id: string
+  name: string
+  institution_type: string | null
+  submit_to: string | null
+  min_deal: number | null
+  max_deal: number | null
+  appetite: number | null
+  confidence: number | null
+  approval_speed: string | null
+  broker_friendly: boolean | null
+  checked: string | null
+  packet_profile: string
+  fast_track: boolean
+}
+
+interface PacketItem {
+  key: string
+  label: string
+  kind: string
+  satisfied: boolean
+  evidence: string
+}
+
+interface Packet {
+  lender: { name: string; institution_type: string | null; submit_to: string | null } | null
+  profile: { source: string; tier: string; notes: string[]; fast_track: boolean }
+  checklist: PacketItem[]
+  ready: number
+  required: number
+  outstanding: string[]
+  subject: string
+  text: string
+}
+
+function money(v: number | null) {
+  if (v === null || v === undefined) return "any"
+  if (v >= 1000000) return "$" + (v / 1000000).toFixed(v % 1000000 ? 1 : 0) + "M"
+  if (v >= 1000) return "$" + Math.round(v / 1000) + "K"
+  return "$" + v
+}
+
+function fastTrack(l: ShortLender) {
+  return Boolean(l.submit_to && l.broker_friendly)
+}
+
+function PacketPanel({ leadId }: { leadId: string }) {
+  const [lenders, setLenders] = useState<ShortLender[]>([])
+  const [loading, setLoading] = useState(true)
+  const [chosen, setChosen] = useState<ShortLender | null>(null)
+  const [packet, setPacket] = useState<Packet | null>(null)
+  const [building, setBuilding] = useState(false)
+  const [onlyFast, setOnlyFast] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [to, setTo] = useState("")
+
+  useEffect(() => {
+    fetch(`/api/admin/submissions/${leadId}/lenders?limit=40`)
+      .then(r => r.json())
+      .then(b => { if (b.success) setLenders(b.data.lenders) })
+      .catch(() => setError("could not read the lender shortlist"))
+      .finally(() => setLoading(false))
+  }, [leadId])
+
+  const build = async (l: ShortLender) => {
+    setChosen(l)
+    setPacket(null)
+    setSent(null)
+    setError(null)
+    setBuilding(true)
+    setTo(l.submit_to || "")
+    try {
+      const r = await fetch(`/api/admin/submissions/${leadId}/packet?lender_id=${l.id}`)
+      const b = await r.json()
+      if (b.success) setPacket(b.data)
+      else setError(b.error || "the packet could not be built")
+    } catch {
+      setError("could not reach the API")
+    }
+    setBuilding(false)
+  }
+
+  const send = async () => {
+    if (!chosen) return
+    setSending(true)
+    setError(null)
+    try {
+      const r = await fetch(`/api/admin/submissions/${leadId}/packet/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lender_id: chosen.id, to }),
+      })
+      const b = await r.json()
+      if (b.success) setSent(b.data.to)
+      else setError(b.error || "the packet was not accepted")
+    } catch {
+      setError("could not reach the API")
+    }
+    setSending(false)
+  }
+
+  const shown = onlyFast ? lenders.filter(fastTrack) : lenders
+
+  return (
+    <div onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-3">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Build a packet
+        </h4>
+        <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+          <input type="checkbox" checked={onlyFast} onChange={e => setOnlyFast(e.target.checked)}
+                 className="h-3.5 w-3.5 rounded border-zinc-600 bg-zinc-900 accent-indigo-500" />
+          fast track only
+        </label>
+        {loading && <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
+      </div>
+
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        <div className="max-h-72 overflow-y-auto rounded-lg border border-zinc-800 divide-y divide-zinc-800">
+          {shown.map(l => (
+            <button
+              key={l.id}
+              onClick={() => build(l)}
+              className={cn(
+                "w-full text-left px-3 py-2.5 hover:bg-zinc-900 transition-colors",
+                chosen?.id === l.id && "bg-zinc-900"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white truncate">{l.name}</span>
+                {fastTrack(l) && <Badge variant="success">fast track</Badge>}
+                {l.packet_profile === "lender" && <Badge variant="blue">profile</Badge>}
+              </div>
+              <div className="text-xs text-zinc-500 mt-0.5">
+                {l.institution_type} · {money(l.min_deal)} to {money(l.max_deal)} · appetite {l.appetite ?? "none"}
+                {l.submit_to ? "" : " · no submission address"}
+              </div>
+            </button>
+          ))}
+          {shown.length === 0 && !loading && (
+            <p className="px-3 py-6 text-sm text-zinc-500">No lender fits this deal</p>
+          )}
+        </div>
+
+        <div>
+          {building && <p className="text-sm text-zinc-500 flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />building
+          </p>}
+
+          {packet && (
+            <>
+              <div className="flex items-center gap-2">
+                <Badge variant={packet.ready === packet.required ? "success" : "warning"}>
+                  {packet.ready} of {packet.required} ready
+                </Badge>
+                <span className="text-xs text-zinc-500">
+                  {packet.profile.tier} · {packet.profile.source} profile
+                </span>
+              </div>
+              <div className="mt-3 max-h-48 overflow-y-auto space-y-1">
+                {packet.checklist.map(c => (
+                  <div key={c.key} className="flex items-start gap-2 text-sm">
+                    {c.satisfied
+                      ? <Check className="h-4 w-4 text-green-400 shrink-0 mt-0.5" />
+                      : <X className="h-4 w-4 text-zinc-600 shrink-0 mt-0.5" />}
+                    <span className={c.satisfied ? "text-zinc-200" : "text-zinc-500"}>{c.label}</span>
+                  </div>
+                ))}
+              </div>
+              {packet.profile.notes.map((n, i) => (
+                <p key={i} className="mt-3 text-xs text-amber-300/80">{n}</p>
+              ))}
+              <div className="mt-4 space-y-2">
+                <Input className={INP} placeholder="submission address" value={to}
+                       onChange={e => setTo(e.target.value)} />
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={send} disabled={sending || !to}>
+                    {sending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                    Send packet
+                  </Button>
+                  <a
+                    href={`/api/admin/submissions/${leadId}/packet?lender_id=${chosen?.id}`}
+                    target="_blank" rel="noreferrer"
+                  >
+                    <Button size="sm" variant="outline"><FileText className="h-4 w-4 mr-2" />View</Button>
+                  </a>
+                </div>
+              </div>
+              {sent && (
+                <p className="mt-3 text-sm text-green-400 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />Packet accepted for delivery to {sent}
+                </p>
+              )}
+            </>
+          )}
+
+          {!packet && !building && (
+            <p className="text-sm text-zinc-500">Pick a lender to build its packet</p>
+          )}
+          {error && (
+            <p className="mt-3 text-sm text-red-300 flex items-start gap-2" role="alert">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />{error}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SubmissionRow({
+  r, onChanged, selected, onSelect,
+}: {
+  r: Submission
+  onChanged: () => void
+  selected: boolean
+  onSelect: (id: string, on: boolean) => void
+}) {
   const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showPacket, setShowPacket] = useState(false)
   const [tags, setTags] = useState<string[]>(r.tags || [])
   const [saving, setSaving] = useState(false)
   const [to, setTo] = useState("")
@@ -278,6 +502,21 @@ function SubmissionRow({ r, onChanged }: { r: Submission; onChanged: () => void 
     onChanged()
   }
 
+  const remove = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/submissions/${r.id}`, { method: "DELETE" })
+      const b = await res.json()
+      if (!b.success) { setError(b.error || "it was not deleted"); setDeleting(false); return }
+    } catch {
+      setError("could not reach the API")
+      setDeleting(false)
+      return
+    }
+    onChanged()
+  }
+
   const state = alertState(r)
   const isCheck = r.source === "admin_test"
 
@@ -285,6 +524,15 @@ function SubmissionRow({ r, onChanged }: { r: Submission; onChanged: () => void 
     <>
       <tr className={cn("text-zinc-300 cursor-pointer hover:bg-zinc-900/60", isCheck && "opacity-70")}
           onClick={() => setOpen(o => !o)}>
+        <td className="py-2.5 pr-2" onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={e => onSelect(r.id, e.target.checked)}
+            aria-label="Select this submission"
+            className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-indigo-500"
+          />
+        </td>
         <td className="py-2.5 pr-3 text-zinc-600">
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </td>
@@ -309,11 +557,30 @@ function SubmissionRow({ r, onChanged }: { r: Submission; onChanged: () => void 
             )}
           </div>
         </td>
+        <td className="py-2.5 pr-2" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={e => { e.stopPropagation(); setOpen(true); setShowPacket(true) }}
+              title="Build a packet for a lender"
+              className="p-1.5 rounded text-zinc-500 hover:text-primary hover:bg-zinc-800 transition-colors"
+            >
+              <Package className="h-4 w-4" />
+            </button>
+            <button
+              onClick={remove}
+              disabled={deleting}
+              title="Delete this submission"
+              className="p-1.5 rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </button>
+          </div>
+        </td>
       </tr>
 
       {open && (
         <tr>
-          <td colSpan={7} className="bg-zinc-900/40 px-4 py-4">
+          <td colSpan={9} className="bg-zinc-900/40 px-4 py-4">
             <div className="grid gap-5 md:grid-cols-2">
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tags</h4>
@@ -376,6 +643,14 @@ function SubmissionRow({ r, onChanged }: { r: Submission; onChanged: () => void 
                 )}
               </div>
             </div>
+
+            <div className="mt-5 pt-5 border-t border-zinc-800">
+              {showPacket
+                ? <PacketPanel leadId={r.id} />
+                : <Button size="sm" variant="outline" onClick={e => { e.stopPropagation(); setShowPacket(true) }}>
+                    <Package className="h-4 w-4 mr-2" />Build a packet
+                  </Button>}
+            </div>
           </td>
         </tr>
       )}
@@ -390,6 +665,10 @@ function SubmissionsTab() {
   const [product, setProduct] = useState("")
   const [alert, setAlert] = useState("")
   const [hideChecks, setHideChecks] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState<string | null>(null)
+  const [confirmWipe, setConfirmWipe] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -399,9 +678,43 @@ function SubmissionsTab() {
       if (b.success) setRows(b.data)
     } catch { /* the empty state covers it */ }
     setLoading(false)
+    setPicked(new Set())
+    setConfirmWipe(false)
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const bulk = async (action: string, tags?: string[], all?: boolean) => {
+    setBusy(action)
+    setNote(null)
+    try {
+      const body: Record<string, unknown> = { action, tags }
+      if (all) {
+        body.ids = "all"
+        if (product) body.product = product
+        if (q.trim()) body.q = q.trim().toLowerCase()
+        if (alert) body.alert = alert
+        body.include_tests = !hideChecks
+      } else {
+        body.ids = [...picked]
+      }
+      const r = await fetch("/api/admin/submissions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const b = await r.json()
+      setNote(b.success
+        ? (action === "delete"
+            ? `${b.data.submissions} deleted`
+            : `${b.data.changed} of ${b.data.requested} changed`)
+        : (b.error || "the action was refused"))
+    } catch {
+      setNote("could not reach the API")
+    }
+    setBusy(null)
+    load()
+  }
 
   const needle = q.trim().toLowerCase()
   const shown = rows.filter(r => {
@@ -474,10 +787,54 @@ function SubmissionsTab() {
         every matching submission, the whole form body included, and follows the filters set here.
       </p>
 
+      {(picked.size > 0 || confirmWipe) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3">
+          <span className="text-sm text-white font-medium">{picked.size} selected</span>
+          <Button size="sm" variant="outline" onClick={() => bulk("tag", ["hot"])}
+                  disabled={busy !== null || picked.size === 0}>Tag hot</Button>
+          <Button size="sm" variant="outline" onClick={() => bulk("tag", ["qualified"])}
+                  disabled={busy !== null || picked.size === 0}>Tag qualified</Button>
+          <Button size="sm" variant="outline" onClick={() => bulk("untag", ["hot", "qualified", "junk"])}
+                  disabled={busy !== null || picked.size === 0}>Clear tags</Button>
+          <Button size="sm" onClick={() => bulk("delete")}
+                  disabled={busy !== null || picked.size === 0}
+                  className="bg-red-600 hover:bg-red-700 text-white">
+            {busy === "delete" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Delete selected
+          </Button>
+          <span className="mx-1 h-5 w-px bg-zinc-700" />
+          {confirmWipe
+            ? <Button size="sm" onClick={() => bulk("delete", undefined, true)}
+                      disabled={busy !== null}
+                      className="bg-red-700 hover:bg-red-800 text-white">
+                Confirm: delete all {shown.length} shown
+              </Button>
+            : <Button size="sm" variant="outline" onClick={() => setConfirmWipe(true)}>
+                Delete everything shown
+              </Button>}
+          <Button size="sm" variant="outline" onClick={() => { setPicked(new Set()); setConfirmWipe(false) }}>
+            Cancel
+          </Button>
+          {note && <span className="text-sm text-zinc-300">{note}</span>}
+        </div>
+      )}
+      {note && picked.size === 0 && !confirmWipe && (
+        <p className="mt-3 text-sm text-zinc-300">{note}</p>
+      )}
+
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 border-b border-zinc-800">
+              <th className="py-2 pr-2 font-medium w-6">
+                <input
+                  type="checkbox"
+                  aria-label="Select everything shown"
+                  checked={shown.length > 0 && picked.size === shown.length}
+                  onChange={e => setPicked(e.target.checked ? new Set(shown.map(r => r.id)) : new Set())}
+                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 accent-indigo-500"
+                />
+              </th>
               <th className="py-2 pr-3 font-medium w-6"></th>
               <th className="py-2 pr-4 font-medium">Received</th>
               <th className="py-2 pr-4 font-medium">Form</th>
@@ -485,12 +842,25 @@ function SubmissionsTab() {
               <th className="py-2 pr-4 font-medium">Amount</th>
               <th className="py-2 pr-4 font-medium">Alert</th>
               <th className="py-2 pr-4 font-medium">Tags</th>
+              <th className="py-2 pr-2 font-medium">Do</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
-            {shown.map(r => <SubmissionRow key={r.id} r={r} onChanged={load} />)}
+            {shown.map(r => (
+              <SubmissionRow
+                key={r.id}
+                r={r}
+                onChanged={load}
+                selected={picked.has(r.id)}
+                onSelect={(id, on) => setPicked(p => {
+                  const s = new Set(p)
+                  if (on) s.add(id); else s.delete(id)
+                  return s
+                })}
+              />
+            ))}
             {shown.length === 0 && !loading && (
-              <tr><td colSpan={7} className="py-6 text-center text-zinc-500">
+              <tr><td colSpan={9} className="py-6 text-center text-zinc-500">
                 <Inbox className="h-5 w-5 mx-auto mb-2" />Nothing matches
               </td></tr>
             )}
@@ -607,9 +977,9 @@ function TestsTab() {
         <h2 className="text-lg font-semibold text-white">Form checks</h2>
         <p className="text-sm text-zinc-400 mt-1">
           Choose any of the four forms, or all of them, and run the submission path end
-          to end. No message is sent by a run: the alert path is never entered, so a run
-          costs nothing against the daily Notify allowance. Each run leaves one
-          submission tagged admin_test so it stays apart from a real application.
+          to end. No message is sent by a run, because the alert path is never entered.
+          Each run leaves one submission tagged admin_test so it stays apart from a real
+          application.
         </p>
 
         <div className="mt-4 space-y-2">
@@ -947,9 +1317,8 @@ function SiteDocs() {
           brand belongs to the configuration rather than to the message.
         </p>
         <p>
-          Notify allows 10 messages per destination per day and 200 across the account per
-          day. Those ceilings are shared by all four forms. Past the ceiling the
-          application is still stored and the refusal is recorded.
+          When an alert is refused the application is still stored and the refusal is
+          recorded against it, so nothing is lost.
         </p>
       </Doc>
 
@@ -967,7 +1336,7 @@ function SiteDocs() {
           appetite, deal size limits, products, industries, equipment, regions, contacts,
           sources, a confidence score and the date it was last checked. Deal Matcher scores
           a deal on size, industry, geography, risk, product and speed. Market Intel
-          summarises the set. Watchlist is present but holds nothing yet.
+          summarises the set.
         </p>
       </Doc>
 
@@ -991,7 +1360,7 @@ function SiteDocs() {
           The Tests tab exercises the submission path for any or all of the four forms. A
           run stores an application, reads it back, confirms the product and amount
           survived and confirms that no alert was raised. The alert path is never entered,
-          so a run cannot consume the daily allowance. Runs are tagged admin_test.
+          so a run cannot send anything. Runs are tagged admin_test.
         </p>
         <p>
           Browser level checks of each form, which fill the fields and submit for real, live

@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { ArrowLeft, Building2, Globe, Phone, Mail, Star, Shield, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, MapPin, RefreshCw, Check, Camera } from "lucide-react"
+import { ArrowLeft, Building2, Globe, Phone, Mail, Shield, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, MapPin, RefreshCw, Check, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { apiService } from "@/api"
-import type { Lender, WatchlistEntry } from "@/api/types"
+import type { Lender } from "@/api/types"
 import { formatDollars, formatDate, daysSince, formatRelativeDate, labelLenderType, labelApprovalSpeed, labelProduct, labelIndustry, cn } from "@/lib/utils"
 
 function logoUrl(website?: string): string | null {
@@ -100,7 +100,6 @@ export function LenderDetailsPage() {
   const navigate = useNavigate()
   const [lender, setLender] = useState<Lender | null>(null)
   const [loading, setLoading] = useState(true)
-  const [watchEntry, setWatchEntry] = useState<WatchlistEntry | null>(null)
   const [crawling, setCrawling] = useState(false)
   const [crawlSent, setCrawlSent] = useState(false)
   const [crawlPolling, setCrawlPolling] = useState(false)
@@ -111,12 +110,8 @@ export function LenderDetailsPage() {
   useEffect(() => {
     if (!lenderId) return
     setLoading(true)
-    Promise.all([
-      apiService.getLender(lenderId),
-      apiService.getWatchlist(),
-    ]).then(([l, wl]) => {
+    apiService.getLender(lenderId).then(l => {
       setLender(l)
-      setWatchEntry(wl.find(e => e.lenderId === lenderId) ?? null)
       setLoading(false)
     })
     // Check if screenshot exists
@@ -141,17 +136,6 @@ export function LenderDetailsPage() {
       setScreenshotError(true)
     } finally {
       setScreenshotLoading(false)
-    }
-  }
-
-  const handleWatchToggle = async () => {
-    if (!lender) return
-    if (watchEntry) {
-      await apiService.removeFromWatchlist(watchEntry.id)
-      setWatchEntry(null)
-    } else {
-      const entry = await apiService.addToWatchlist(lender.id)
-      setWatchEntry(entry)
     }
   }
 
@@ -210,15 +194,6 @@ export function LenderDetailsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant={watchEntry ? "default" : "outline"}
-              size="sm"
-              className="gap-2"
-              onClick={handleWatchToggle}
-            >
-              <Star className={cn("h-4 w-4", watchEntry && "fill-white")} />
-              {watchEntry ? "Watching" : "Watch"}
-            </Button>
             <Button
               variant="outline"
               size="sm"

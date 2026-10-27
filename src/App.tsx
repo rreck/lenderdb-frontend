@@ -5,7 +5,6 @@ import {
   LenderDetailsPage,
   DealMatcherPage,
   MarketIntelligencePage,
-  WatchlistPage,
   CrawlerPage,
   ApplyPage,
   LeadsPage,
@@ -23,7 +22,6 @@ function App() {
           <Route path="lenders/:lenderId" element={<LenderDetailsPage />} />
           <Route path="match" element={<DealMatcherPage />} />
           <Route path="market" element={<MarketIntelligencePage />} />
-          <Route path="watchlist" element={<WatchlistPage />} />
           <Route path="crawler" element={<CrawlerPage />} />
           <Route path="apply" element={<ApplyPage />} />
           <Route path="apply/:product" element={<ApplyPage />} />

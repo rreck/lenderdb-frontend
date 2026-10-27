@@ -1,4 +1,4 @@
-import { Building2, TrendingUp, Star, Shield, ExternalLink, RefreshCw, Check, BadgeCheck } from "lucide-react"
+import { Building2, TrendingUp, Shield, ExternalLink, RefreshCw, Check, BadgeCheck, Zap } from "lucide-react"
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import type { Lender } from "@/api/types"
@@ -7,8 +7,6 @@ import { formatDollars, labelLenderType, labelApprovalSpeed, cn } from "@/lib/ut
 interface LenderCardProps {
   lender: Lender
   onClick: () => void
-  isWatched?: boolean
-  onWatchToggle?: (e: React.MouseEvent) => void
   onCrawl?: (e: React.MouseEvent) => Promise<void>
 }
 
@@ -67,7 +65,13 @@ function updatedAtMeta(updatedAt: string): { dot: string; color: string; label: 
   return { dot: "bg-red-400", color: "text-red-400", label }
 }
 
-export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl }: LenderCardProps) {
+/** A packet can go straight to this lender: a submission address is on record
+ *  and the lender takes broker business. */
+export function canFastTrack(l: { originationsEmail?: string; brokerFriendly?: boolean }) {
+  return Boolean(l.originationsEmail && l.originationsEmail.includes("@") && l.brokerFriendly)
+}
+
+export function LenderCard({ lender, onClick, onCrawl }: LenderCardProps) {
   const [crawling, setCrawling] = useState(false)
   const [crawlSent, setCrawlSent] = useState(false)
   const latestSignal = lender.appetiteSignals
@@ -110,6 +114,14 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <p className="text-xs text-zinc-500">{labelLenderType(lender.lenderType)}</p>
+            {canFastTrack(lender) && (
+              <span
+                title="A submission address is on record and this lender takes broker business, so a packet can go straight out"
+                className="inline-flex items-center gap-1 rounded-full border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-green-400"
+              >
+                <Zap className="h-2.5 w-2.5" />FAST TRACK
+              </span>
+            )}
             {lender.website && (
               <a
                 href={lender.website.startsWith("http") ? lender.website : `https://${lender.website}`}
@@ -124,16 +136,6 @@ export function LenderCard({ lender, onClick, isWatched, onWatchToggle, onCrawl 
             )}
           </div>
         </div>
-        <button
-          onClick={onWatchToggle}
-          className={cn(
-            "p-1 rounded transition-colors opacity-0 group-hover:opacity-100",
-            isWatched ? "opacity-100 text-yellow-400" : "text-zinc-600 hover:text-yellow-400"
-          )}
-          title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
-        >
-          <Star className={cn("h-4 w-4", isWatched && "fill-yellow-400")} />
-        </button>
       </div>
 
       {/* Deal range */}

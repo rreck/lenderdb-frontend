@@ -2,7 +2,7 @@ import { API_CONFIG, API_ENDPOINTS, type RequestOptions } from "./config"
 import { localStorageService, initializeLocalStorage } from "./localStorage"
 import { matchLenders } from "./matcher"
 import { MOCK_LENDERS } from "@/data/mockLenders"
-import type { Lender, LenderPage, CrawlerStatus, WatchlistEntry, DealProfile, DealMatchResult, LenderFilters, MarketSummary } from "./types"
+import type { Lender, LenderPage, CrawlerStatus, DealProfile, DealMatchResult, LenderFilters, MarketSummary } from "./types"
 
 if (API_CONFIG.isLocalMode) {
   initializeLocalStorage()
@@ -36,10 +36,22 @@ export const apiService = {
       return { lenders, total: lenders.length, hasMore: false, offset: 0 }
     }
     const params = filters ? `?${new URLSearchParams(filters as Record<string, string>)}` : ""
-    const res = await httpClient<{ data: { lenders: Lender[]; total: number; hasMore: boolean; offset: number } }>(`${API_ENDPOINTS.lenders.list}${params}`)
-    const lenders = res.data?.lenders ?? []
-    const total = res.data?.total ?? lenders.length
-    return { lenders, total, hasMore: res.data?.hasMore ?? false, offset: res.data?.offset ?? 0 }
+    // The API answers { success, data: Lender[], total }. It used to wrap the
+    // array in an object, so both shapes are accepted here.
+    const res = await httpClient<{
+      data: Lender[] | { lenders: Lender[]; total: number; hasMore: boolean; offset: number }
+      total?: number
+    }>(`${API_ENDPOINTS.lenders.list}${params}`)
+    const payload = res.data
+    const lenders = Array.isArray(payload) ? payload : (payload?.lenders ?? [])
+    const total = Array.isArray(payload)
+      ? (res.total ?? lenders.length)
+      : (payload?.total ?? lenders.length)
+    const offset = Number((filters as Record<string, unknown>)?.offset ?? 0)
+    const hasMore = Array.isArray(payload)
+      ? offset + lenders.length < total
+      : (payload?.hasMore ?? false)
+    return { lenders, total, hasMore, offset }
   },
 
   async getLender(id: string): Promise<Lender | null> {
@@ -68,28 +80,6 @@ export const apiService = {
   },
 
   // ==========================================
-  // Watchlist
-  // ==========================================
-  async getWatchlist(): Promise<WatchlistEntry[]> {
-    if (API_CONFIG.isLocalMode) return localStorageService.getWatchlist()
-    const res = await httpClient<{ data: WatchlistEntry[] }>(API_ENDPOINTS.watchlist.list)
-    return res.data
-  },
-
-  async addToWatchlist(lenderId: string): Promise<WatchlistEntry> {
-    if (API_CONFIG.isLocalMode) return localStorageService.addToWatchlist(lenderId)
-    const res = await httpClient<{ data: WatchlistEntry }>(API_ENDPOINTS.watchlist.add, {
-      method: "POST",
-      body: { lenderId },
-    })
-    return res.data
-  },
-
-  async removeFromWatchlist(entryId: string): Promise<boolean> {
-    if (API_CONFIG.isLocalMode) return localStorageService.removeFromWatchlist(entryId)
-    await httpClient(API_ENDPOINTS.watchlist.remove(entryId), { method: "DELETE" })
-    return true
-  },
 
   // ==========================================
   // Market Intelligence
