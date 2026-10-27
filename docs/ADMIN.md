@@ -11,11 +11,30 @@ page: /admin
 Administration gathers the controls that change how the site behaves, the record
 of what it has received, the state of the crawler, a way to check the forms
 without disturbing anyone, and the documentation of both the site and this page.
-It is reached at `https://finance.rrecktek.com/admin`.
+It is reached at `https://finance.rrecktek.com/admin` and by that address alone.
+No link to it appears anywhere on the site, so it is not advertised to a visitor
+and not followed by a crawler working through the navigation.
 
 The crawler view and the submissions view were previously separate pages. They
 are now tabs here. Their own addresses still answer, so an existing link keeps
 working.
+
+---
+
+## Getting in
+
+**LenderDB administration, version 1.0.0**
+
+The page opens black with one small box. A four digit code shows the contents.
+The code unlocks for the browser tab only: a new tab asks again.
+
+The code is `0000`. It can be set at build time through the environment variable
+`VITE_ADMIN_CODE`, which avoids editing the source to change it.
+
+This hides the page rather than guards it. The interfaces listed at the end of
+this document answer on their own, so anybody who knows their addresses reaches
+the data without passing the box. Treat the code as a screen in front of a
+window, not a lock on a door.
 
 ---
 

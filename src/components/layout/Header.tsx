@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, ClipboardList, Users, Award, Settings } from "lucide-react"
+import { Database, Zap, BarChart3, Star, Bell, MessageSquare, X, ClipboardList, Award } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// The crawler and the submissions view now live as tabs on /admin. Their own
+// The crawler, the leads and the submissions views now live behind /admin, which
+// is deliberately absent from this bar and reached by address alone. Their own
 // routes still answer, so an existing link keeps working.
 const navItems = [
   { name: "Lender Database", path: "/lenders", icon: Database },
@@ -11,9 +12,7 @@ const navItems = [
   { name: "Market Intel", path: "/market", icon: BarChart3 },
   { name: "Watchlist", path: "/watchlist", icon: Star },
   { name: "Apply", path: "/apply", icon: ClipboardList },
-  { name: "Leads", path: "/leads", icon: Users },
   { name: "Why Us?", path: "/why-us", icon: Award },
-  { name: "Admin", path: "/admin", icon: Settings },
 ]
 
 export function Header() {

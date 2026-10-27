@@ -704,6 +704,23 @@ function AdminGuide() {
         </p>
       </Doc>
 
+      <Doc title="Getting in">
+        <p>
+          This page is reached by its address alone. No link to it appears anywhere on the
+          site, so it is neither advertised to a visitor nor followed by a crawler working
+          through the navigation.
+        </p>
+        <p>
+          It opens black with one small box. A four digit code shows the contents. The
+          code unlocks for the browser tab only: a new tab asks again.
+        </p>
+        <p>
+          This hides the page rather than guards it. The interfaces behind it answer on
+          their own, so anybody who knows their addresses reaches the data without passing
+          the box. Treat the code as a screen in front of a window, not a lock on a door.
+        </p>
+      </Doc>
+
       <Doc title="Notify tab">
         <p>
           Purpose: decide which mobile numbers hear about a new application.
@@ -1001,7 +1018,63 @@ function SiteDocs() {
 
 /* ── page ────────────────────────────────────────────────────────────────── */
 
+/* ── gate ────────────────────────────────────────────────────────────────── */
+
+// The code can be set at build time. It gates the view only: the interfaces
+// behind it answer on their own, so this hides the page rather than guards it.
+const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "0000"
+const GATE_KEY = "lenderdb.admin.open"
+
+function Gate({ onOpen }: { onOpen: () => void }) {
+  const [code, setCode] = useState("")
+  const [wrong, setWrong] = useState(false)
+
+  const submit = (value: string) => {
+    if (value === ADMIN_CODE) {
+      try { sessionStorage.setItem(GATE_KEY, "1") } catch { /* private window */ }
+      onOpen()
+      return
+    }
+    setWrong(true)
+    setCode("")
+    window.setTimeout(() => setWrong(false), 1200)
+  }
+
+  const change = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 4)
+    setCode(digits)
+    if (digits.length === 4) submit(digits)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+      <input
+        autoFocus
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        aria-label="Code"
+        placeholder="0000"
+        value={code}
+        onChange={e => change(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") submit(code) }}
+        className={cn(
+          "w-28 bg-black text-center font-mono text-2xl tracking-[0.5em] text-zinc-200",
+          "border rounded-md py-2 outline-none transition-colors",
+          wrong ? "border-red-600" : "border-zinc-800 focus:border-zinc-600"
+        )}
+      />
+    </div>
+  )
+}
+
 export function AdminPage() {
+  const [open, setOpen] = useState(() => {
+    try { return sessionStorage.getItem(GATE_KEY) === "1" } catch { return false }
+  })
+
+  if (!open) return <Gate onOpen={() => setOpen(true)} />
+
   return (
     <div className="p-6 max-w-7xl">
       <h1 className="text-2xl font-bold text-white">Administration</h1>
@@ -1009,17 +1082,17 @@ export function AdminPage() {
         Alert destinations, submissions, the crawler, the form checks and how the site works.
       </p>
 
-      <Tabs defaultValue="notify" className="mt-6">
+      <Tabs defaultValue="submissions" className="mt-6">
         <TabsList className={TABLIST}>
-          <TabsTrigger value="notify" className={TAB}><Bell className="h-4 w-4" />Notify</TabsTrigger>
           <TabsTrigger value="submissions" className={TAB}><Inbox className="h-4 w-4" />Submissions</TabsTrigger>
+          <TabsTrigger value="notify" className={TAB}><Bell className="h-4 w-4" />Notify</TabsTrigger>
           <TabsTrigger value="crawler" className={TAB}><Bot className="h-4 w-4" />Crawler</TabsTrigger>
           <TabsTrigger value="tests" className={TAB}><FlaskConical className="h-4 w-4" />Tests</TabsTrigger>
           <TabsTrigger value="docs" className={TAB}><BookOpen className="h-4 w-4" />Documentation</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="notify"><NotifyTab /></TabsContent>
         <TabsContent value="submissions"><SubmissionsTab /></TabsContent>
+        <TabsContent value="notify"><NotifyTab /></TabsContent>
         <TabsContent value="crawler"><CrawlerTab /></TabsContent>
         <TabsContent value="tests"><TestsTab /></TabsContent>
         <TabsContent value="docs"><DocsTab /></TabsContent>
