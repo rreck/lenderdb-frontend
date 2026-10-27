@@ -668,6 +668,8 @@ function SubmissionsTab() {
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState<string | null>(null)
   const [confirmWipe, setConfirmWipe] = useState(false)
+  const [wipeWord, setWipeWord] = useState("")
+  const [armed, setArmed] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -680,23 +682,48 @@ function SubmissionsTab() {
     setLoading(false)
     setPicked(new Set())
     setConfirmWipe(false)
+    setWipeWord("")
+    setArmed(false)
   }, [])
 
   useEffect(() => { load() }, [load])
 
+  /** Hand the caller back the exact rows that were removed, as a file. */
+  const keepCopy = (rows: unknown[]) => {
+    try {
+      const blob = new Blob([JSON.stringify(rows, null, 1)], { type: "application/json" })
+      const a = document.createElement("a")
+      a.href = URL.createObjectURL(blob)
+      a.download = `deleted-submissions.${Math.floor(Date.now() / 1000)}.json`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch { /* the server also keeps a copy in its log */ }
+  }
+
   const bulk = async (action: string, tags?: string[], all?: boolean) => {
+    // The selection is read once, here, and the server is told how many rows
+    // this call believes it is touching. If the two disagree, nothing happens.
+    const ids = [...picked]
+    if (!all && ids.length === 0) {
+      setNote("nothing is selected")
+      return
+    }
     setBusy(action)
     setNote(null)
     try {
       const body: Record<string, unknown> = { action, tags }
       if (all) {
-        body.ids = "all"
+        body.scope = "all"
+        body.confirm = "DELETE ALL"
+        body.expect = shown.length
         if (product) body.product = product
         if (q.trim()) body.q = q.trim().toLowerCase()
         if (alert) body.alert = alert
         body.include_tests = !hideChecks
       } else {
-        body.ids = [...picked]
+        body.scope = "selection"
+        body.ids = ids
+        body.expect = ids.length
       }
       const r = await fetch("/api/admin/submissions/bulk", {
         method: "POST",
@@ -704,15 +731,19 @@ function SubmissionsTab() {
         body: JSON.stringify(body),
       })
       const b = await r.json()
-      setNote(b.success
-        ? (action === "delete"
-            ? `${b.data.submissions} deleted`
-            : `${b.data.changed} of ${b.data.requested} changed`)
-        : (b.error || "the action was refused"))
+      if (b.success && action === "delete") {
+        keepCopy(b.data.backup || [])
+        setNote(`${b.data.submissions} removed, and a copy was saved to your downloads`)
+      } else {
+        setNote(b.success
+          ? `${b.data.changed} of ${b.data.requested} changed`
+          : (b.error || "the action was refused"))
+      }
     } catch {
       setNote("could not reach the API")
     }
     setBusy(null)
+    setArmed(false)
     load()
   }
 
@@ -788,34 +819,76 @@ function SubmissionsTab() {
       </p>
 
       {(picked.size > 0 || confirmWipe) && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3">
-          <span className="text-sm text-white font-medium">{picked.size} selected</span>
-          <Button size="sm" variant="outline" onClick={() => bulk("tag", ["hot"])}
-                  disabled={busy !== null || picked.size === 0}>Tag hot</Button>
-          <Button size="sm" variant="outline" onClick={() => bulk("tag", ["qualified"])}
-                  disabled={busy !== null || picked.size === 0}>Tag qualified</Button>
-          <Button size="sm" variant="outline" onClick={() => bulk("untag", ["hot", "qualified", "junk"])}
-                  disabled={busy !== null || picked.size === 0}>Clear tags</Button>
-          <Button size="sm" onClick={() => bulk("delete")}
-                  disabled={busy !== null || picked.size === 0}
-                  className="bg-red-600 hover:bg-red-700 text-white">
-            {busy === "delete" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
-            Delete selected
-          </Button>
-          <span className="mx-1 h-5 w-px bg-zinc-700" />
-          {confirmWipe
-            ? <Button size="sm" onClick={() => bulk("delete", undefined, true)}
-                      disabled={busy !== null}
-                      className="bg-red-700 hover:bg-red-800 text-white">
-                Confirm: delete all {shown.length} shown
-              </Button>
-            : <Button size="sm" variant="outline" onClick={() => setConfirmWipe(true)}>
-                Delete everything shown
-              </Button>}
-          <Button size="sm" variant="outline" onClick={() => { setPicked(new Set()); setConfirmWipe(false) }}>
-            Cancel
-          </Button>
-          {note && <span className="text-sm text-zinc-300">{note}</span>}
+        <div className="mt-3 rounded-lg border border-primary/40 bg-primary/10 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-white font-medium">{picked.size} selected</span>
+            <Button size="sm" variant="outline" onClick={() => bulk("tag", ["hot"])}
+                    disabled={busy !== null || picked.size === 0}>Tag hot</Button>
+            <Button size="sm" variant="outline" onClick={() => bulk("tag", ["qualified"])}
+                    disabled={busy !== null || picked.size === 0}>Tag qualified</Button>
+            <Button size="sm" variant="outline" onClick={() => bulk("untag", ["hot", "qualified", "junk"])}
+                    disabled={busy !== null || picked.size === 0}>Clear tags</Button>
+            <span className="mx-1 h-5 w-px bg-zinc-700" />
+            {armed
+              ? <Button size="sm" onClick={() => bulk("delete")} disabled={busy !== null}
+                        className="bg-red-700 hover:bg-red-800 text-white">
+                  {busy === "delete" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                  Yes, remove these {picked.size}
+                </Button>
+              : <Button size="sm" variant="outline" onClick={() => setArmed(true)}
+                        disabled={busy !== null || picked.size === 0}
+                        className="border-red-500/50 text-red-300 hover:text-red-200">
+                  <Trash2 className="h-4 w-4 mr-2" />Delete these {picked.size}
+                </Button>}
+            <Button size="sm" variant="outline"
+                    onClick={() => { setPicked(new Set()); setConfirmWipe(false); setArmed(false) }}>
+              Cancel
+            </Button>
+            {note && <span className="text-sm text-zinc-300">{note}</span>}
+          </div>
+
+          {armed && (
+            <div className="mt-3 rounded border border-red-500/40 bg-red-500/10 p-3">
+              <p className="text-sm text-red-200 font-medium">
+                These {picked.size} will be removed. Nothing else is touched.
+              </p>
+              <ul className="mt-2 max-h-40 overflow-y-auto text-xs text-zinc-300 space-y-0.5">
+                {shown.filter(r => picked.has(r.id)).map(r => (
+                  <li key={r.id} className="font-mono">
+                    {fmt(r.created_at)} · {r.product} · {r.name || "no name"} · {r.deal_amount || "no amount"}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-zinc-400">
+                A copy of every row, the whole form body and its alert history included,
+                downloads to this machine as the delete happens, and the server keeps one too.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-zinc-700/60 pt-3">
+            {confirmWipe
+              ? <>
+                  <span className="text-sm text-red-200">
+                    Type DELETE to remove all {shown.length} shown
+                  </span>
+                  <Input
+                    className={cn(INP, "h-8 w-32")}
+                    value={wipeWord}
+                    onChange={e => setWipeWord(e.target.value)}
+                    placeholder="DELETE"
+                  />
+                  <Button size="sm" disabled={busy !== null || wipeWord !== "DELETE"}
+                          onClick={() => bulk("delete", undefined, true)}
+                          className="bg-red-700 hover:bg-red-800 text-white">
+                    Remove all {shown.length}
+                  </Button>
+                </>
+              : <Button size="sm" variant="outline" onClick={() => setConfirmWipe(true)}
+                        className="border-zinc-700 text-zinc-400">
+                  Delete everything shown
+                </Button>}
+          </div>
         </div>
       )}
       {note && picked.size === 0 && !confirmWipe && (
