@@ -53,6 +53,16 @@ const SORT_OPTIONS: { label: string; value: SortField }[] = [
 const PAGE_SIZE = 100
 const POLL_MS = 30000
 
+function freshAgo(iso: string | null) {
+  if (!iso) return "a while ago"
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 2) return "a minute ago"
+  if (mins < 60) return mins + " minutes ago"
+  const hrs = Math.round(mins / 60)
+  if (hrs < 48) return hrs + (hrs === 1 ? " hour ago" : " hours ago")
+  return Math.round(hrs / 24) + " days ago"
+}
+
 export function LendersPage() {
   const navigate = useNavigate()
   const [lenders, setLenders] = useState<Lender[]>([])
@@ -63,12 +73,17 @@ export function LendersPage() {
   const [dbTotal, setDbTotal] = useState<number | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<LenderFilters>({})
+  const [fresh, setFresh] = useState<{
+    lenders_with_signals: number
+    changed_24h: number
+    changed_7d: number
+    newest_check: string | null
+  } | null>(null)
   const [fastOnly, setFastOnly] = useState(false)
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const lastPollTime = useRef<string>(new Date().toISOString())
   const [crawlerStatus, setCrawlerStatus] = useState<CrawlerStatus | null>(null)
-  const [lastChecked, setLastChecked] = useState<Date | null>(null)
 
   const fetchLenders = useCallback(async () => {
     setLoading(true)
@@ -80,7 +95,6 @@ export function LendersPage() {
       setHasMore(result.lenders.length < result.total)
       setOffset(result.lenders.length)
       lastPollTime.current = new Date().toISOString()
-      setLastChecked(new Date())
     } catch (e) {
       console.error("fetchLenders failed", e)
     } finally {
@@ -111,7 +125,6 @@ export function LendersPage() {
     const since = lastPollTime.current
     lastPollTime.current = new Date().toISOString()
     const result = await apiService.getLenders({ ...filters, updatedAfter: since })
-    setLastChecked(new Date())
     if (result.lenders.length === 0) return
     setLenders(prev => {
       const byId = new Map(prev.map(l => [l.id, l]))
@@ -136,6 +149,12 @@ export function LendersPage() {
   useEffect(() => {
     fetchLenders()
   }, [fetchLenders])
+
+  useEffect(() => {
+    fetch("/api/freshness").then(r => r.json())
+      .then(b => { if (b.success) setFresh(b.data) })
+      .catch(() => { /* the line simply says less */ })
+  }, [])
 
   const toggleDealSize = (preset: typeof DEAL_SIZE_PRESETS[0]) => {
     setFilters(prev => ({
@@ -221,17 +240,16 @@ export function LendersPage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-white">Lender Database</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">
-            {dbTotal !== null ? (
-              <>
-                <span className="text-zinc-400">{lenders.length.toLocaleString()}</span>
-                {" of "}
-                <span className="text-white font-medium">{dbTotal.toLocaleString()}</span> lenders loaded
-              </>
-            ) : (
-              <>{lenders.length} lenders</>
-            )}
-            {" · "}appetite intelligence updated daily
+          <p className="text-sm text-zinc-400 mt-1">
+            Showing <span className="text-white font-medium">{lenders.length.toLocaleString()}</span>
+            {dbTotal !== null && <> of <span className="text-white font-medium">{dbTotal.toLocaleString()}</span></>}
+            {" active lenders. "}
+            {fresh
+              ? <>
+                  <span className="text-white font-medium">{fresh.changed_24h.toLocaleString()}</span>
+                  {" records changed today, the newest "}{freshAgo(fresh.newest_check)}{"."}
+                </>
+              : null}
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -271,6 +289,9 @@ export function LendersPage() {
           )}
         </div>
       </div>
+
+      {/* Sort and filter bars stay under the masthead while the tiles scroll */}
+      <div className="sticky top-14 z-40 -mx-6 px-6 pt-3 bg-black border-b border-zinc-800">
 
       {/* Sort bar */}
       <div className="flex items-center gap-1.5 mb-3 flex-wrap">
@@ -351,6 +372,8 @@ export function LendersPage() {
           <Zap className="h-4 w-4" />
           Fast Track
         </Button>
+
+      </div>
 
       </div>
 
@@ -505,9 +528,15 @@ export function LendersPage() {
       <div className="flex items-center justify-between mb-3 min-h-[28px]">
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
           <Clock className="h-3 w-3" />
-          {lastChecked
-            ? <>Checked <span className="text-zinc-400">{lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span></>
-            : "Waiting for first check…"
+          {fresh
+            ? <>
+                Each tile carries its own check date.
+                {" "}<span className="text-zinc-400">{fresh.changed_24h.toLocaleString()}</span>
+                {" of these records changed in the last 24 hours, "}
+                <span className="text-zinc-400">{fresh.changed_7d.toLocaleString()}</span>
+                {" in the last week"}
+              </>
+            : "Each tile carries its own check date"
           }
         </div>
         {hasMore && (

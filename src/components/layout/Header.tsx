@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { Database, Zap, BarChart3, Bell, MessageSquare, X, ClipboardList, Award } from "lucide-react"
+import { Database, Zap, BarChart3, Bell, MessageSquare, X, ClipboardList, Award, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // The crawler, the leads and the submissions views now live behind /admin, which
@@ -8,10 +8,9 @@ import { cn } from "@/lib/utils"
 // routes still answer, so an existing link keeps working.
 const navItems = [
   { name: "Lender Database", path: "/lenders", icon: Database },
-  { name: "Deal Matcher", path: "/match", icon: Zap },
   { name: "Market Intel", path: "/market", icon: BarChart3 },
-  { name: "Apply", path: "/apply", icon: ClipboardList },
   { name: "Why Us?", path: "/why-us", icon: Award },
+  { name: "Deal Matcher", path: "/match", icon: Zap },
 ]
 
 export function Header() {
@@ -21,14 +20,14 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-800 bg-black text-white">
       <div className="flex h-14 items-center px-6">
-        {/* Logo */}
+        {/* Masthead, worded as the printed material is */}
         <div className="flex items-center gap-3 mr-8">
-            <Link to="/why-us" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <Database className="h-4 w-4 text-primary" />
-            <span className="text-sm font-bold tracking-tight">LenderDB</span>
+          <Link to="/why-us" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            <img src="/rrecktek-inv.png" alt="RRECKTEK" className="h-6" />
+            <span className="text-lg font-bold tracking-wide text-white leading-none">FINANCE</span>
           </Link>
-          <span className="text-[11px] text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
-            Equipment Finance Intelligence
+          <span className="hidden lg:block text-[10px] uppercase tracking-widest text-gray-500 leading-tight border-l border-zinc-700 pl-3">
+            A division of RCR<br />International Finance
           </span>
         </div>
 
@@ -41,19 +40,41 @@ export function Header() {
               location.pathname.startsWith(item.path)
             const Icon = item.icon
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                  isActive
-                    ? "bg-primary/20 text-primary"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
+              <div key={item.path} className="flex items-center">
+                <Link
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                    isActive
+                      ? "bg-primary/20 text-primary"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+
+                {/* The one action a visitor is here to take. It is a button
+                    rather than a link, and it sits immediately to the right of
+                    the database rather than at the end of the bar. */}
+                {item.path === "/lenders" && (
+                  <Link to="/apply" className="mx-3">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-lg px-6 py-2.5 text-base font-extrabold tracking-wide",
+                        "shadow-lg shadow-primary/30 transition-colors",
+                        location.pathname.startsWith("/apply")
+                          ? "bg-white text-black"
+                          : "bg-primary text-white hover:bg-primary/85"
+                      )}
+                    >
+                      <ClipboardList className="h-5 w-5" />
+                      APPLY
+                      <ArrowRight className="h-5 w-5" />
+                    </span>
+                  </Link>
                 )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.name}
-              </Link>
+              </div>
             )
           })}
         </nav>

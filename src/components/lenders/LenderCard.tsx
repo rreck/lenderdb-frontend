@@ -83,8 +83,30 @@ export function LenderCard({ lender, onClick, onCrawl }: LenderCardProps) {
       onClick={onClick}
       className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 cursor-pointer hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 transition-all group"
     >
-      {/* Header */}
+      {/* Header. The mark sits first, at the upper left of the tile, so the
+          eye lands on the lender before anything else. */}
       <div className="flex items-start justify-between mb-3">
+        <div className="mr-3 shrink-0">
+          <div className="h-9 w-9 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+            {favicon ? (
+              <img
+                src={favicon}
+                alt=""
+                className="h-7 w-7 object-contain"
+                onError={(e) => {
+                  const el = e.target as HTMLImageElement
+                  if (lender.website && !el.src.includes("google.com")) {
+                    try { el.src = faviconUrl(lender.website) } catch { el.style.display = "none" }
+                  } else {
+                    el.style.display = "none"
+                  }
+                }}
+              />
+            ) : (
+              <Building2 className="h-5 w-5 text-zinc-600" />
+            )}
+          </div>
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <h3 className="text-sm font-semibold text-white truncate">{lender.name}</h3>
@@ -95,22 +117,6 @@ export function LenderCard({ lender, onClick, onCrawl }: LenderCardProps) {
             <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0", tierColor(lender.tier))}>
               T{lender.tier}
             </span>
-            {favicon ? (
-              <img
-                src={favicon}
-                alt=""
-                className="h-5 w-5 rounded-sm shrink-0 object-contain"
-                onError={(e) => {
-                  const el = e.target as HTMLImageElement
-                  if (lender.website && !el.src.includes("google.com")) {
-                    try { el.src = faviconUrl(lender.website) } catch { el.style.display = "none" }
-                  } else {
-                    el.style.display = "none"
-                  }
-                }}
-              />
-            ) : null}
-            {!favicon && <Building2 className="h-4 w-4 text-zinc-600 shrink-0" />}
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <p className="text-xs text-zinc-500">{labelLenderType(lender.lenderType)}</p>

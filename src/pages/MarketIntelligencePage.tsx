@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
-import { TrendingUp, TrendingDown, Minus, BarChart3, Loader2, Clock } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, BarChart3, Loader2, Clock, RefreshCw, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { apiService } from "@/api"
 import type { MarketSummary, AppetiteSignal } from "@/api/types"
 import { formatDate, cn } from "@/lib/utils"
@@ -196,6 +197,124 @@ function AppetiteSection() {
   )
 }
 
+/* ── public reporting on this kind of lending ─────────────────────────────── */
+
+interface NewsItem {
+  topic: string
+  title: string
+  source: string
+  url: string
+  published: string
+}
+
+function timeAgo(published: string) {
+  const t = new Date(published).getTime()
+  if (!t) return ""
+  const hrs = Math.round((Date.now() - t) / 3600000)
+  if (hrs < 1) return "just now"
+  if (hrs < 48) return hrs + (hrs === 1 ? " hour ago" : " hours ago")
+  return Math.round(hrs / 24) + " days ago"
+}
+
+function NewsFeed() {
+  const [items, setItems] = useState<NewsItem[]>([])
+  const [topics, setTopics] = useState<string[]>([])
+  const [topic, setTopic] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [when, setWhen] = useState("")
+
+  const load = (refresh = false) => {
+    setLoading(true)
+    fetch("/api/market/news" + (refresh ? "?refresh=true" : ""))
+      .then(r => r.json())
+      .then(b => {
+        if (b.success) {
+          setItems(b.data.items)
+          setTopics(b.data.topics)
+          setWhen(b.data.fetched_at)
+        }
+      })
+      .catch(() => { /* the panel stays empty */ })
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const shown = topic ? items.filter(i => i.topic === topic) : items
+
+  return (
+    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-sm font-semibold text-white">What is being reported</h2>
+          <p className="text-xs text-zinc-500 mt-1">
+            Public reporting on equipment finance, leasing, factoring and trade, from news
+            search. Headlines link to the outlet. Nothing here is our own writing.
+            {when && <> Read {timeAgo(when)}.</>}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading}>
+          <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        <button
+          onClick={() => setTopic("")}
+          className={cn("text-[11px] px-2.5 py-1 rounded-full border transition-colors",
+            topic === "" ? "bg-primary text-white border-primary"
+                         : "border-zinc-700 text-zinc-400 hover:text-white")}
+        >
+          Everything ({items.length})
+        </button>
+        {topics.map(t => {
+          const n = items.filter(i => i.topic === t).length
+          if (!n) return null
+          return (
+            <button
+              key={t}
+              onClick={() => setTopic(t)}
+              className={cn("text-[11px] px-2.5 py-1 rounded-full border transition-colors",
+                topic === t ? "bg-primary text-white border-primary"
+                            : "border-zinc-700 text-zinc-400 hover:text-white")}
+            >
+              {t} ({n})
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="mt-4 max-h-[26rem] overflow-y-auto divide-y divide-zinc-800">
+        {shown.map((i, k) => (
+          <a
+            key={k}
+            href={i.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block py-2.5 group"
+          >
+            <div className="flex items-start gap-2">
+              <ExternalLink className="h-3.5 w-3.5 text-zinc-600 shrink-0 mt-0.5 group-hover:text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm text-zinc-200 group-hover:text-white">{i.title}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {i.source}
+                  {i.published && <> · {timeAgo(i.published)}</>}
+                  <span className="text-zinc-600"> · {i.topic}</span>
+                </p>
+              </div>
+            </div>
+          </a>
+        ))}
+        {shown.length === 0 && !loading && (
+          <p className="py-6 text-sm text-zinc-500">Nothing came back</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function MarketIntelligencePage() {
   const [summary, setSummary] = useState<MarketSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -225,6 +344,8 @@ export function MarketIntelligencePage() {
           Lender appetite trends across the equipment finance market · <span className="text-white">appetite intelligence updated daily</span>
         </p>
       </div>
+
+      <NewsFeed />
 
       <AppetiteSection />
 

@@ -301,8 +301,7 @@ export function WhyUsPage() {
     <div className="p-6 max-w-6xl mx-auto pb-16">
 
       {/* ── Page header ── */}
-      <div className="mb-8 flex items-baseline gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold text-white">Why Us?</h1>
+      <div className="mb-8">
         <span className="text-sm text-white">
           Verified performance data · 20+ years · &gt;$140M placed · 50+ closed transactions
         </span>

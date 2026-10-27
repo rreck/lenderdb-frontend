@@ -17,7 +17,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<Navigate to="/why-us" replace />} />
+          <Route index element={<Navigate to="/lenders" replace />} />
           <Route path="lenders" element={<LendersPage />} />
           <Route path="lenders/:lenderId" element={<LenderDetailsPage />} />
           <Route path="match" element={<DealMatcherPage />} />
