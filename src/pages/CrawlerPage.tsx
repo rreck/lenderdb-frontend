@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from "react"
 import { Bot, Play, RefreshCw, Loader2, AlertCircle, Clock, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-const CRAWLER_URL = import.meta.env.VITE_CRAWLER_URL || "/crawler"
+// The crawler is reached through the API, which proxies it on the internal
+// network. A direct /crawler path is not published at the edge.
+const CRAWLER_URL = import.meta.env.VITE_CRAWLER_URL || "/api/crawler"
 
 interface CrawlerStatus {
   status: "running" | "idle"

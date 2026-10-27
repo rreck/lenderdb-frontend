@@ -10,6 +10,7 @@ import {
   ApplyPage,
   LeadsPage,
   WhyUsPage,
+  AdminPage,
 } from "@/pages"
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
           <Route path="apply/:product" element={<ApplyPage />} />
           <Route path="leads" element={<LeadsPage />} />
           <Route path="why-us" element={<WhyUsPage />} />
+          <Route path="admin" element={<AdminPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
