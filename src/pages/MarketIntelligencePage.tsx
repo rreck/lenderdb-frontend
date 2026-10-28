@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { TrendingUp, TrendingDown, Minus, BarChart3, Loader2, Clock, RefreshCw, ExternalLink } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, BarChart3, Loader2, Clock, RefreshCw, ExternalLink, Newspaper } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { apiService } from "@/api"
@@ -203,8 +203,49 @@ interface NewsItem {
   topic: string
   title: string
   source: string
+  source_url?: string
+  image?: string | null
   url: string
   published: string
+}
+
+/* One colour per topic, carried through the chip, the rule and the label so a
+   headline can be placed without reading it. */
+const TOPIC_COLOR: Record<string, { bar: string; chip: string; text: string }> = {
+  "Equipment finance":    { bar: "bg-indigo-500",  chip: "bg-indigo-500/15 border-indigo-500/40 text-indigo-300",   text: "text-indigo-300" },
+  "Equipment leasing":    { bar: "bg-sky-500",     chip: "bg-sky-500/15 border-sky-500/40 text-sky-300",            text: "text-sky-300" },
+  "Originations":         { bar: "bg-emerald-500", chip: "bg-emerald-500/15 border-emerald-500/40 text-emerald-300", text: "text-emerald-300" },
+  "Credit conditions":    { bar: "bg-amber-500",   chip: "bg-amber-500/15 border-amber-500/40 text-amber-300",      text: "text-amber-300" },
+  "Trucking and fleet":   { bar: "bg-orange-500",  chip: "bg-orange-500/15 border-orange-500/40 text-orange-300",   text: "text-orange-300" },
+  "Construction equipment": { bar: "bg-yellow-500", chip: "bg-yellow-500/15 border-yellow-500/40 text-yellow-300",  text: "text-yellow-300" },
+  "Factoring and A/R":    { bar: "bg-fuchsia-500", chip: "bg-fuchsia-500/15 border-fuchsia-500/40 text-fuchsia-300", text: "text-fuchsia-300" },
+  "Trade finance":        { bar: "bg-teal-500",    chip: "bg-teal-500/15 border-teal-500/40 text-teal-300",         text: "text-teal-300" },
+}
+const TOPIC_FALLBACK = { bar: "bg-zinc-600", chip: "bg-zinc-800 border-zinc-700 text-zinc-300", text: "text-zinc-300" }
+const topicColor = (t: string) => TOPIC_COLOR[t] ?? TOPIC_FALLBACK
+
+/* The outlet's own mark. Google serves a redirect rather than the article, so
+   the picture that is actually available is the publisher's. */
+function outletMark(item: NewsItem): string | null {
+  const host = item.source_url
+  if (!host) return null
+  try {
+    const u = new URL(host.startsWith("http") ? host : `https://${host}`)
+    return `https://logo.clearbit.com/${u.hostname}`
+  } catch {
+    return null
+  }
+}
+
+function outletFavicon(item: NewsItem): string | null {
+  const host = item.source_url
+  if (!host) return null
+  try {
+    const u = new URL(host.startsWith("http") ? host : `https://${host}`)
+    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`
+  } catch {
+    return null
+  }
 }
 
 function timeAgo(published: string) {
@@ -246,10 +287,10 @@ function NewsFeed() {
     <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-5 mb-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-sm font-semibold text-white">What is being reported</h2>
+          <h2 className="text-sm font-semibold text-white">Industry news</h2>
           <p className="text-xs text-zinc-500 mt-1">
-            Public reporting on equipment finance, leasing, factoring and trade, from news
-            search. Headlines link to the outlet. Nothing here is our own writing.
+            Equipment finance, leasing, factoring and trade. Each headline opens at the
+            outlet that published it.
             {when && <> Read {timeAgo(when)}.</>}
           </p>
         </div>
@@ -263,7 +304,7 @@ function NewsFeed() {
         <button
           onClick={() => setTopic("")}
           className={cn("text-[11px] px-2.5 py-1 rounded-full border transition-colors",
-            topic === "" ? "bg-primary text-white border-primary"
+            topic === "" ? "bg-white text-black border-white"
                          : "border-zinc-700 text-zinc-400 hover:text-white")}
         >
           Everything ({items.length})
@@ -271,42 +312,67 @@ function NewsFeed() {
         {topics.map(t => {
           const n = items.filter(i => i.topic === t).length
           if (!n) return null
+          const c = topicColor(t)
           return (
             <button
               key={t}
-              onClick={() => setTopic(t)}
-              className={cn("text-[11px] px-2.5 py-1 rounded-full border transition-colors",
-                topic === t ? "bg-primary text-white border-primary"
+              onClick={() => setTopic(topic === t ? "" : t)}
+              className={cn(
+                "text-[11px] px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5",
+                topic === t ? c.chip + " ring-1 ring-inset ring-current"
                             : "border-zinc-700 text-zinc-400 hover:text-white")}
             >
+              <span className={cn("h-1.5 w-1.5 rounded-full", c.bar)} />
               {t} ({n})
             </button>
           )
         })}
       </div>
 
-      <div className="mt-4 max-h-[26rem] overflow-y-auto divide-y divide-zinc-800">
-        {shown.map((i, k) => (
-          <a
-            key={k}
-            href={i.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block py-2.5 group"
-          >
-            <div className="flex items-start gap-2">
-              <ExternalLink className="h-3.5 w-3.5 text-zinc-600 shrink-0 mt-0.5 group-hover:text-primary" />
-              <div className="min-w-0">
-                <p className="text-sm text-zinc-200 group-hover:text-white">{i.title}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {i.source}
+      <div className="mt-4 max-h-[30rem] overflow-y-auto space-y-1 pr-1">
+        {shown.map((i, k) => {
+          const c = topicColor(i.topic)
+          const mark = i.image || outletMark(i)
+          return (
+            <a
+              key={k}
+              href={i.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-stretch gap-3 rounded-lg hover:bg-zinc-800/50 transition-colors group p-2"
+            >
+              <span className={cn("w-1 rounded-full shrink-0", c.bar)} />
+              <span className="h-11 w-11 shrink-0 rounded-md bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center">
+                {mark ? (
+                  <img
+                    src={mark}
+                    alt=""
+                    className="h-full w-full object-contain"
+                    onError={e => {
+                      const el = e.target as HTMLImageElement
+                      const fav = outletFavicon(i)
+                      if (fav && !el.src.includes("google.com")) el.src = fav
+                      else el.style.display = "none"
+                    }}
+                  />
+                ) : (
+                  <Newspaper className="h-5 w-5 text-zinc-600" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-zinc-100 group-hover:text-white leading-snug">
+                  {i.title}
+                </span>
+                <span className="block text-xs text-zinc-500 mt-1">
+                  <span className="text-zinc-300">{i.source}</span>
                   {i.published && <> · {timeAgo(i.published)}</>}
-                  <span className="text-zinc-600"> · {i.topic}</span>
-                </p>
-              </div>
-            </div>
-          </a>
-        ))}
+                  {" · "}<span className={c.text}>{i.topic}</span>
+                </span>
+              </span>
+              <ExternalLink className="h-3.5 w-3.5 text-zinc-700 shrink-0 mt-1 group-hover:text-primary" />
+            </a>
+          )
+        })}
         {shown.length === 0 && !loading && (
           <p className="py-6 text-sm text-zinc-500">Nothing came back</p>
         )}

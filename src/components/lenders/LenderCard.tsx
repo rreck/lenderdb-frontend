@@ -30,9 +30,46 @@ function speedDot(speed: string) {
 }
 
 function countryFlag(code: string): string {
-  return code.toUpperCase().replace(/[A-Z]/g, c =>
-    String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)
+  const c = (code || "").trim().toUpperCase()
+  if (!/^[A-Z]{2}$/.test(c)) return c          // anything else stays as text
+  return c.replace(/[A-Z]/g, ch =>
+    String.fromCodePoint(0x1F1E6 + ch.charCodeAt(0) - 65)
   )
+}
+
+/* Where no mark can be fetched, the lender's own initials on a colour derived
+   from its name. Stable, so the same lender always looks the same. */
+function initials(name: string): string {
+  const words = name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/).filter(Boolean)
+  const skip = new Set(["the", "of", "and", "inc", "llc", "ltd", "co", "corp", "na", "fsb"])
+  const useful = words.filter(w => !skip.has(w.toLowerCase()))
+  const pick = useful.length ? useful : words
+  return (pick[0]?.[0] ?? "?").toUpperCase() + (pick[1]?.[0] ?? "").toUpperCase()
+}
+
+const MARK_TINTS = [
+  "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+  "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  "bg-sky-500/20 text-sky-300 border-sky-500/30",
+  "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30",
+  "bg-teal-500/20 text-teal-300 border-teal-500/30",
+  "bg-rose-500/20 text-rose-300 border-rose-500/30",
+]
+
+/* Used when a logo fails after the image has mounted, so the tile never shows
+   a broken picture. */
+function markNode(name: string): HTMLElement {
+  const el = document.createElement("span")
+  el.className = "text-[13px] font-bold leading-none"
+  el.textContent = initials(name)
+  return el
+}
+
+function markTint(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return MARK_TINTS[h % MARK_TINTS.length]
 }
 
 function clearbitUrl(website: string): string {
@@ -87,7 +124,10 @@ export function LenderCard({ lender, onClick, onCrawl }: LenderCardProps) {
           eye lands on the lender before anything else. */}
       <div className="flex items-start justify-between mb-3">
         <div className="mr-3 shrink-0">
-          <div className="h-9 w-9 rounded-md bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden">
+          <div className={cn(
+            "h-9 w-9 rounded-md border flex items-center justify-center overflow-hidden",
+            favicon ? "bg-zinc-800 border-zinc-700" : markTint(lender.name)
+          )}>
             {favicon ? (
               <img
                 src={favicon}
@@ -96,14 +136,14 @@ export function LenderCard({ lender, onClick, onCrawl }: LenderCardProps) {
                 onError={(e) => {
                   const el = e.target as HTMLImageElement
                   if (lender.website && !el.src.includes("google.com")) {
-                    try { el.src = faviconUrl(lender.website) } catch { el.style.display = "none" }
+                    try { el.src = faviconUrl(lender.website) } catch { el.replaceWith(markNode(lender.name)) }
                   } else {
-                    el.style.display = "none"
+                    el.replaceWith(markNode(lender.name))
                   }
                 }}
               />
             ) : (
-              <Building2 className="h-5 w-5 text-zinc-600" />
+              <span className="text-[13px] font-bold leading-none">{initials(lender.name)}</span>
             )}
           </div>
         </div>
